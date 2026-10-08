@@ -1,0 +1,1 @@
+Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.

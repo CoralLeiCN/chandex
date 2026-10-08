@@ -1,0 +1,4 @@
+src/codex/protocol/
+node_modules/
+dist/
+.codeboom/

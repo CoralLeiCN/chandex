@@ -1,0 +1,29 @@
+{
+  "question": {
+    "id": "supported-02",
+    "question": "What database does Proposal B recommend?",
+    "expectedStatus": "answered",
+    "expected": "PostgreSQL"
+  },
+  "answer": {
+    "status": "answered",
+    "title": "Proposal B database",
+    "blocks": [
+      {
+        "text": "Proposal B recommends PostgreSQL with a separate database service and user accounts.",
+        "kind": "fact",
+        "citations": [
+          {
+            "passageId": "0203b455af818887cade193123d95c31",
+            "quote": "It recommends PostgreSQL with a separate database service and user accounts.",
+            "start": 43,
+            "end": 119
+          }
+        ]
+      }
+    ],
+    "coverageWarnings": []
+  },
+  "elapsedMs": 12522,
+  "change": "Exact quote location hints during bounded repair"
+}

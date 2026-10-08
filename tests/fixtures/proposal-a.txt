@@ -1,0 +1,1 @@
+Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.

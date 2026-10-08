@@ -1,0 +1,24 @@
+# Local application data and scratch files
+.codeboom/
+data/
+tmp/
+.DS_Store
+
+# Dependencies and generated build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Runtime logs and SQLite sidecars
+*.log
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm

@@ -1,0 +1,43 @@
+{
+  "name": "codeboom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.10.0 <27"
+  },
+  "packageManager": "npm@12.1.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "codex:generate": "node scripts/generate-protocol.mjs",
+    "harness:check": "tsx scripts/harness-check.ts",
+    "build": "vite build",
+    "start": "tsx src/server/main.ts",
+    "dev": "npm run build && tsx watch src/server/main.ts",
+    "isolation:check": "tsx scripts/isolation-check.ts",
+    "data": "tsx scripts/backup.ts",
+    "evaluate": "tsx scripts/evaluate.ts",
+    "format": "prettier --write src scripts tests package.json tsconfig.json"
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "ajv": "8.20.0",
+    "ipaddr.js": "2.5.0",
+    "jsdom": "30.1.2",
+    "pdfjs-dist": "6.4.299",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@openai/codex": "0.161.0",
+    "@types/jsdom": "30.0.0",
+    "@types/node": "26.0.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "prettier": "3.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
