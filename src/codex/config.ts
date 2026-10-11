@@ -23,7 +23,11 @@ export const disabledFeatures = [
   "sleep_tool",
   "tool_suggest",
 ];
-export function codexArgs(): string[] {
+export function codexArgs(
+  webSearch: "disabled" | "live" = "disabled",
+): string[] {
+  if (webSearch !== "disabled" && webSearch !== "live")
+    throw Error("Unsupported web search mode.");
   return [
     "app-server",
     "--listen",
@@ -34,7 +38,7 @@ export function codexArgs(): string[] {
     "--enable",
     "code_mode_host",
     "-c",
-    'web_search="disabled"',
+    'web_search="' + webSearch + '"',
     "-c",
     "project_doc_max_bytes=0",
     "-c",

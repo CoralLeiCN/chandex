@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { createInterface } from "node:readline";
+import { runtimeFailure } from "./errors.ts";
 
 export class Rpc extends EventEmitter {
   private nextId = 1;
@@ -13,6 +13,7 @@ export class Rpc extends EventEmitter {
     }
   >();
   readonly process: ChildProcessWithoutNullStreams;
+  readonly settled: Promise<void>;
   private closed = false;
   private diagnostics = "";
   constructor(command: string, args: string[], cwd: string) {
@@ -22,11 +23,10 @@ export class Rpc extends EventEmitter {
       stdio: "pipe",
       env: { ...process.env },
     });
-    const lines = createInterface({
-      input: this.process.stdout,
-      crlfDelay: Infinity,
-    });
-    lines.on("line", (line) => {
+    this.settled = new Promise((resolve) =>
+      this.process.once("close", () => resolve()),
+    );
+    const onLine = (line: string) => {
       if (line.length > 4_000_000) {
         this.close(new Error("Runtime message exceeded limit."));
         return;
@@ -34,6 +34,8 @@ export class Rpc extends EventEmitter {
       let message: any;
       try {
         message = JSON.parse(line);
+        if (!message || typeof message !== "object" || Array.isArray(message))
+          throw new Error("Invalid runtime message.");
       } catch {
         this.close(new Error("Invalid runtime protocol."));
         return;
@@ -45,10 +47,29 @@ export class Rpc extends EventEmitter {
         clearTimeout(pending.timer);
         if (message.error)
           pending.reject(
-            new Error(message.error.message ?? "Runtime request failed."),
+            runtimeFailure(
+              message.error.message ?? "Runtime request failed.",
+              message.error.data?.codexErrorInfo,
+            ),
           );
         else pending.resolve(message.result);
       } else this.emit("message", message);
+    };
+    let buffer = "";
+    this.process.stdout.setEncoding("utf8");
+    this.process.stdout.on("data", (chunk: string) => {
+      if (this.closed) return;
+      buffer += chunk;
+      let end: number;
+      while (!this.closed && (end = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, end).replace(/\r$/, "");
+        buffer = buffer.slice(end + 1);
+        onLine(line);
+      }
+      if (buffer.length > 4_000_000) {
+        buffer = "";
+        this.close(new Error("Runtime message exceeded limit."));
+      }
     });
     this.process.stderr.on("data", (chunk) => {
       this.diagnostics = (this.diagnostics + String(chunk)).slice(-8000);

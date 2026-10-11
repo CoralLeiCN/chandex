@@ -14,20 +14,51 @@
     "harness:check": "tsx scripts/harness-check.ts",
     "build": "vite build",
     "start": "tsx src/server/main.ts",
+    "preview": "node --import tsx scripts/preview.ts",
     "dev": "npm run build && tsx watch src/server/main.ts",
     "isolation:check": "tsx scripts/isolation-check.ts",
     "data": "tsx scripts/backup.ts",
     "evaluate": "tsx scripts/evaluate.ts",
-    "format": "prettier --write src scripts tests package.json tsconfig.json"
+    "evaluate:artifacts": "tsx scripts/evaluate-artifacts.ts",
+    "profile": "tsx scripts/profile.ts",
+    "review": "tsx scripts/review.ts",
+    "format": "prettier --write src scripts tests package.json tsconfig.json",
+    "evaluate:study": "tsx scripts/evaluate-study.ts",
+    "review:study": "tsx scripts/review-study.ts",
+    "evaluate:structured": "tsx scripts/evaluate-structured.ts",
+    "evaluate:infographic": "node --import tsx scripts/evaluate-infographic.ts",
+    "evaluate:slides": "node --import tsx scripts/evaluate-slides.ts",
+    "audio:setup": "node --import tsx scripts/audio-setup.ts",
+    "audio:check": "node --import tsx scripts/audio-check.ts",
+    "overview:check": "node --import tsx scripts/overview-check.ts",
+    "dictation:check": "node --import tsx scripts/dictation-check.ts",
+    "drive:setup": "node --import tsx scripts/drive-setup.ts",
+    "drive:check": "node --import tsx scripts/drive-check.ts"
   },
   "dependencies": {
+    "@audio/decode-aac": "1.6.0",
+    "@audio/decode-flac": "1.3.5",
+    "@audio/decode-mp3": "1.3.1",
+    "@audio/decode-opus": "1.3.3",
+    "@audio/decode-vorbis": "1.3.4",
+    "@huggingface/transformers": "4.3.1",
     "@mozilla/readability": "0.6.0",
+    "@napi-rs/canvas": "1.0.10",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/react": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
     "ajv": "8.20.0",
     "ipaddr.js": "2.5.0",
     "jsdom": "30.1.2",
     "pdfjs-dist": "6.4.299",
+    "pptxgenjs": "4.0.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "saxes": "6.0.0",
+    "tesseract.js-core": "6.1.2",
+    "yauzl": "3.4.0"
   },
   "devDependencies": {
     "@openai/codex": "0.161.0",
@@ -35,9 +66,15 @@
     "@types/node": "26.0.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/yauzl": "3.4.0",
     "prettier": "3.9.9",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vite": "8.3.4"
+  },
+  "overrides": {
+    "pptxgenjs": {
+      "image-size": "2.0.4"
+    }
   }
 }

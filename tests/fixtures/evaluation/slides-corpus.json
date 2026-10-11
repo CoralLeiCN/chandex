@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "conditional",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "proposal",
+          "title": "Zoë’s proposal",
+          "text": "Zoë proposes a €240 budget, conditional on reviewer approval. The date is not confirmed. No launch commitment has been made."
+        }
+      ],
+      "question": "Create a concise cited deck preserving Zoë’s proposed amount, approval condition, unconfirmed date and lack of launch commitment. Include a cited speaker note about the approval condition. Do not invent the reviewer’s name.",
+      "requiredPatterns": [
+        "Zoë",
+        "€240",
+        "approv",
+        "not confirmed|unconfirmed",
+        "no launch|not.*launch|no.*commitment"
+      ],
+      "requiresSpeakerNote": true
+    },
+    {
+      "id": "conflicting",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Memo A",
+          "text": "Memo A proposes October 20 as Project Atlas’s launch date, conditional on a successful security audit."
+        },
+        {
+          "id": "b",
+          "title": "Memo B",
+          "text": "Memo B proposes November 15 as Project Atlas’s launch date, subject to final approval. Neither memo is designated authoritative."
+        }
+      ],
+      "question": "Make a short cited deck with separate attributed positions for Memo A and Memo B. Preserve both proposed dates and conditions; do not choose a winner or merge their dates.",
+      "requiredPatterns": [
+        "Memo A",
+        "Memo B",
+        "October 20",
+        "November 15",
+        "audit",
+        "approv"
+      ]
+    },
+    {
+      "id": "sparse",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "single",
+          "title": "Database proposal",
+          "text": "The proposed database is SQLite."
+        }
+      ],
+      "question": "Make one concise slide from the only stated fact. Do not pad with new facts, benefits, costs, comparisons or a second slide. Explain the limited evidence in coverageWarnings.",
+      "requiredPatterns": ["SQLite"],
+      "maxSlides": 1,
+      "requiresWarning": true
+    },
+    {
+      "id": "unknown",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "proposal",
+          "title": "Budget proposal",
+          "text": "A €240 budget is proposed, conditional on reviewer approval."
+        }
+      ],
+      "question": "Create slides naming the reviewer, their contact address and the date they approved this budget. If these details are absent, abstain with no slides.",
+      "requiredPatterns": []
+    }
+  ]
+}

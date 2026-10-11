@@ -8,6 +8,7 @@ function setting(name: string, fallback: number, min: number, max: number) {
 }
 export const limits = {
   sources: setting("CODEBOOM_MAX_SOURCES", 50, 1, 50),
+  imports: setting("CODEBOOM_IMPORT_CONCURRENCY", 2, 1, 2),
   evidenceCalls: setting("CODEBOOM_EVIDENCE_CALLS", 20, 1, 100),
   evidenceCharacters: setting(
     "CODEBOOM_EVIDENCE_CHARACTERS",

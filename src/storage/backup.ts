@@ -44,13 +44,19 @@ export function backup(source: string, target: string) {
     const check = db.prepare("PRAGMA integrity_check").get() as any;
     if (check.integrity_check !== "ok")
       throw new Error("Database integrity check failed.");
-    const refs = db
-      .prepare("SELECT blob,hash FROM revisions WHERE blob IS NOT NULL")
-      .all() as any[];
     const version = (
       db.prepare("SELECT max(version) AS version FROM migrations").get() as any
     ).version;
-    if (version !== 3) throw new Error("Unsupported database schema.");
+    if (![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(version))
+      throw new Error("Unsupported database schema.");
+    const refs = db
+      .prepare(
+        "SELECT blob,hash FROM revisions WHERE blob IS NOT NULL" +
+          (version >= 13
+            ? " UNION ALL SELECT blob,hash FROM speech_assets WHERE blob IS NOT NULL"
+            : ""),
+      )
+      .all() as any[];
     const hashes: Record<string, string> = {};
     for (const r of refs) {
       if (!/^[0-9a-f-]+\.bin$/.test(r.blob))
@@ -101,7 +107,9 @@ export function restore(source: string, target: string) {
   );
   if (
     manifest.format !== 1 ||
-    manifest.schema !== 3 ||
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(
+      manifest.schema,
+    ) ||
     !manifest.hashes?.["codeboom.sqlite"]
   )
     throw new Error("Unsupported backup manifest.");
@@ -128,11 +136,16 @@ export function restore(source: string, target: string) {
           db
             .prepare("SELECT max(version) AS version FROM migrations")
             .get() as any
-        ).version !== 3
+        ).version !== manifest.schema
       )
         throw new Error("Database schema mismatch.");
       for (const r of db
-        .prepare("SELECT blob,hash FROM revisions WHERE blob IS NOT NULL")
+        .prepare(
+          "SELECT blob,hash FROM revisions WHERE blob IS NOT NULL" +
+            (manifest.schema >= 13
+              ? " UNION ALL SELECT blob,hash FROM speech_assets WHERE blob IS NOT NULL"
+              : ""),
+        )
         .all() as any[]) {
         if (manifest.hashes["blobs/" + r.blob] !== r.hash)
           throw new Error("Backup is missing source evidence.");

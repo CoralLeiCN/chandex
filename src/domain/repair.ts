@@ -12,10 +12,39 @@ export function citationRepairHints(
     return [];
   }
   const hints: unknown[] = [];
-  if (!Array.isArray(parsed.blocks)) return [];
-  for (const [blockIndex, block] of parsed.blocks.slice(0, 80).entries()) {
-    if (!Array.isArray(block.citations)) continue;
-    for (const [citationIndex, cite] of block.citations
+  const locations = [
+    ...(Array.isArray(parsed.blocks) ? parsed.blocks.slice(0, 80) : []).map(
+      (block: any, blockIndex: number) => ({
+        path: { blockIndex },
+        citations: block?.citations,
+      }),
+    ),
+    ...(Array.isArray(parsed.items) ? parsed.items.slice(0, 20) : []).map(
+      (item: any, itemIndex: number) => ({
+        path: { itemIndex, field: "questionCitations" },
+        citations: item?.questionCitations,
+      }),
+    ),
+    ...(Array.isArray(parsed.nodes) ? parsed.nodes.slice(0, 40) : []).flatMap(
+      (node: any, nodeIndex: number) =>
+        ["labelCitations", "relationCitations"].map((field) => ({
+          path: { nodeIndex, field },
+          citations: node?.[field],
+        })),
+    ),
+    ...["columns", "rows"].flatMap((collection) =>
+      (Array.isArray(parsed[collection])
+        ? parsed[collection].slice(0, 20)
+        : []
+      ).map((entry: any, entryIndex: number) => ({
+        path: { collection, entryIndex, field: "labelCitations" },
+        citations: entry?.labelCitations,
+      })),
+    ),
+  ];
+  for (const location of locations) {
+    if (!Array.isArray(location.citations)) continue;
+    for (const [citationIndex, cite] of location.citations
       .slice(0, 20)
       .entries()) {
       if (
@@ -32,7 +61,7 @@ export function citationRepairHints(
       const second = p.text.indexOf(cite.quote, first + 1);
       if (second < 0)
         hints.push({
-          blockIndex,
+          ...location.path,
           citationIndex,
           passageId: p.id,
           start: points(p.text.slice(0, first)).length,

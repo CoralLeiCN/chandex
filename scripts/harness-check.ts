@@ -1,7 +1,12 @@
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { CodexClient } from "../src/codex/client.ts";
-import { chunkText } from "../src/domain/evidence.ts";
+import {
+  chunkText,
+  TOOL_CONTRACT_VERSION,
+  OUTPUT_CONTRACT_VERSION,
+} from "../src/domain/evidence.ts";
+import type { AdapterStats } from "../src/domain/run-stats.ts";
 const root = path.resolve(".codeboom/harness");
 mkdirSync(root, { recursive: true });
 const passages = ["a", "b"].flatMap((x) =>
@@ -23,12 +28,16 @@ try {
     "models:",
     status.models.length,
   );
+  let stats: AdapterStats | undefined;
   const answer = await client.run({
     passages,
     question:
       "Compare the proposed databases and delivery dates. Cite both proposals.",
     onProgress: (e) => {
       if (e.type === "tool") console.log(e);
+    },
+    onStats: (value) => {
+      stats = value;
     },
   });
   if (
@@ -40,7 +49,14 @@ try {
   writeFileSync(
     path.join(root, "result.json"),
     JSON.stringify(
-      { date: new Date().toISOString(), version: status.version, answer },
+      {
+        date: new Date().toISOString(),
+        version: status.version,
+        toolContractVersion: TOOL_CONTRACT_VERSION,
+        outputContractVersion: OUTPUT_CONTRACT_VERSION,
+        stats,
+        answer,
+      },
       null,
       2,
     ),

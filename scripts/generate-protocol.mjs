@@ -31,6 +31,7 @@ for (const root of [
   "v2/TurnStartParams.ts",
   "v2/DynamicToolCallParams.ts",
   "v2/DynamicToolCallResponse.ts",
+  "v2/ThreadTokenUsageUpdatedNotification.ts",
 ])
   copy(root);
 writeFileSync(path.join(target, "VERSION"), "0.161.0\n");

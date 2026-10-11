@@ -2,6 +2,7 @@
 .codeboom/
 data/
 tmp/
+/evals/
 .DS_Store
 
 # Dependencies and generated build output
