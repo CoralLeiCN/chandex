@@ -1,6 +1,7 @@
 import { limits } from "../domain/limits.ts";
 import type { DynamicToolSpec } from "../codex/protocol/v2/DynamicToolSpec";
 import type { Passage } from "../domain/evidence.ts";
+import type { BudgetCutoff } from "../domain/run-stats.ts";
 const schema = (properties: Record<string, unknown>, required: string[]) => ({
   type: "object",
   properties,
@@ -59,14 +60,19 @@ export class EvidenceTools {
   calls = 0;
   characters = 0;
   readonly read = new Set<string>();
+  readonly budgetReached = new Set<BudgetCutoff>();
   constructor(
     readonly passages: readonly Passage[],
     readonly search?: (query: string, limit: number) => Passage[],
     readonly maxCalls = limits.evidenceCalls,
+    readonly maxCharacters = limits.evidenceCharacters,
+    readonly admitContext?: (serialized: string) => void,
   ) {}
   invoke(name: string, args: unknown): unknown {
-    if (++this.calls > this.maxCalls)
+    if (++this.calls > this.maxCalls) {
+      this.budgetReached.add("evidence_calls");
       throw new Error("Evidence call budget exhausted.");
+    }
     if (!args || typeof args !== "object" || Array.isArray(args))
       throw new Error("Expected tool arguments.");
     const a = args as Record<string, unknown>;
@@ -76,13 +82,22 @@ export class EvidenceTools {
     const allowedKeys = Object.keys((spec.inputSchema as any).properties);
     if (Object.keys(a).some((key) => !allowedKeys.includes(key)))
       throw new Error("Unexpected tool argument.");
-    const safe = (ps: readonly Passage[]) => {
-      const size = ps.reduce((n, p) => n + Array.from(p.text).length, 0);
-      if (this.characters + size > limits.evidenceCharacters)
+    const pendingReads = new Set<string>();
+    const publish = (result: unknown) => {
+      const serialized = JSON.stringify(result);
+      const size = Array.from(serialized).length;
+      if (this.characters + size > this.maxCharacters) {
+        this.budgetReached.add("evidence_characters");
         throw new Error("Evidence character budget exhausted.");
+      }
+      this.admitContext?.(serialized);
       this.characters += size;
+      for (const id of pendingReads) this.read.add(id);
+      return result;
+    };
+    const safe = (ps: readonly Passage[]) => {
       return ps.map((p) => {
-        this.read.add(p.id);
+        pendingReads.add(p.id);
         return p;
       });
     };
@@ -115,7 +130,7 @@ export class EvidenceTools {
             passages: 1,
           });
       }
-      return [...sources.values()];
+      return publish([...sources.values()]);
     }
     if (name === "notebook_read_passage") {
       const p = this.passages.find((p) => p.id === a.passageId);
@@ -125,11 +140,11 @@ export class EvidenceTools {
       if (a.neighbors === 1) {
         const same = this.passages.filter((q) => q.revisionId === p.revisionId),
           index = same.findIndex((q) => q.id === p.id);
-        return {
+        return publish({
           passages: safe(same.slice(Math.max(0, index - 1), index + 2)),
-        };
+        });
       }
-      return safe([p])[0];
+      return publish(safe([p])[0]);
     }
     if (name === "notebook_list_sections") {
       if (
@@ -142,10 +157,10 @@ export class EvidenceTools {
       if (!ps.length)
         throw new Error("Revision is outside the selected sources.");
       const cursor = Number(a.cursor);
-      return {
+      return publish({
         passages: safe(ps.slice(cursor, cursor + 8)),
         nextCursor: cursor + 8 < ps.length ? cursor + 8 : null,
-      };
+      });
     }
     if (name === "notebook_search") {
       if (
@@ -172,10 +187,12 @@ export class EvidenceTools {
             .sort((a, b) => b.score - a.score)
             .slice(0, limit)
             .map((x) => x.p);
-      const allowed = new Set(this.passages.map((p) => p.id));
+      const allowed = new Map(this.passages.map((p) => [p.id, p]));
       if (found.some((p) => !allowed.has(p.id)))
         throw new Error("Retrieval escaped the manifest.");
-      return safe(found);
+      return publish(
+        safe(found.slice(0, limit).map((p) => allowed.get(p.id)!)),
+      );
     }
     throw new Error("Tool is not permitted.");
   }

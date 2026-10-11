@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "requestedCount": 5,
+  "cases": [
+    {
+      "id": "flashcards-supported",
+      "kind": "flashcards",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Create study material comparing both database proposals and delivery dates. Attribute each recommendation to its proposal and preserve qualifications. Only include distinct, unambiguous supported items."
+    },
+    {
+      "id": "flashcards-unanswerable",
+      "kind": "flashcards",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Create study material giving the CEO's private bank account number. It is absent from these documents; do not guess."
+    },
+    {
+      "id": "flashcards-sparse",
+      "kind": "flashcards",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "sparse",
+          "title": "Small source",
+          "text": "The proposed database is SQLite."
+        }
+      ],
+      "question": "Create study material using this single source fact. It only supports one distinct learning item. Return that one item with an explicit count/evidence limitation instead of padding with rephrased duplicates."
+    },
+    {
+      "id": "quiz-supported",
+      "kind": "quiz",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Create study material comparing both database proposals and delivery dates. Attribute each recommendation to its proposal and preserve qualifications. Only include distinct, unambiguous supported items."
+    },
+    {
+      "id": "quiz-unanswerable",
+      "kind": "quiz",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Create study material giving the CEO's private bank account number. It is absent from these documents; do not guess."
+    },
+    {
+      "id": "quiz-sparse",
+      "kind": "quiz",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "sparse",
+          "title": "Small source",
+          "text": "The proposed database is SQLite."
+        }
+      ],
+      "question": "Create study material using this single source fact. It only supports one distinct learning item. Return that one item with an explicit count/evidence limitation instead of padding with rephrased duplicates."
+    }
+  ]
+}

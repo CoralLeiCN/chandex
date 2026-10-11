@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { citationRepairHints } from "../src/domain/repair.ts";
-import { chunkText } from "../src/domain/evidence.ts";
+import { chunkText, evidenceCoverage } from "../src/domain/evidence.ts";
 import { exportMarkdown } from "../src/domain/export.ts";
 test("repair hints locate exact unique quotes only within the cited selected passage", () => {
   const p = chunkText("🦉 Use SQLite. Repeat. Repeat.", "s", "r", "Fixture")[0];
@@ -36,4 +36,52 @@ test("Markdown exports retain public origin, historical revision and unavailable
     exportMarkdown("Note", content, () => null),
     /Evidence unavailable/,
   );
+});
+test("exports retain application-computed omissions alongside model coverage warnings", () => {
+  const passages = chunkText(
+    "Unread text",
+    "s",
+    "r",
+    "Omitted source",
+    "Limitations",
+  );
+  const text = exportMarkdown(
+    "Note",
+    {
+      coverage: evidenceCoverage(passages, new Set()),
+      coverageWarnings: ["Model-specific caution"],
+    },
+    () => null,
+  );
+  assert.match(text, /Model-specific caution/);
+  assert.match(text, /Omitted source; revision r: 0 of 1 passages read/);
+  assert.match(text, /Limitations: 1 of 1 passages not read/);
+});
+
+test("study question repair hints remain scoped to the same selected passage", () => {
+  const passages = chunkText("Evidence 🦉", "s", "r", "Source");
+  const hints = citationRepairHints(
+    JSON.stringify({
+      blocks: [],
+      items: [
+        {
+          questionCitations: [
+            { passageId: passages[0].id, quote: "🦉", start: 0, end: 1 },
+            { passageId: "foreign", quote: "🦉" },
+          ],
+        },
+      ],
+    }),
+    passages,
+  );
+  assert.deepEqual(hints, [
+    {
+      itemIndex: 0,
+      field: "questionCitations",
+      citationIndex: 0,
+      passageId: passages[0].id,
+      start: 9,
+      end: 10,
+    },
+  ]);
 });

@@ -1,0 +1,74 @@
+{
+  "reference": "The project budget is two hundred forty units. The review is on October twelve. Approval is still pending. Do not start the rollout.",
+  "origin": "Synthetic macOS Samantha speech at requested 145 words/minute; FFmpeg converted the generated recording to the listed codecs. No real user audio.",
+  "applicationDependencies": "Neither say nor FFmpeg is invoked by the application.",
+  "generationCommands": {
+    "speech": "say -v Samantha -r 145 -o audio-speech.aiff <reference>",
+    "wav": "ffmpeg -i audio-speech.aiff -ar 16000 -ac 1 speech.wav",
+    "mp3": "ffmpeg -i speech.wav -c:a libmp3lame -b:a 64k speech.mp3",
+    "aac": "ffmpeg -i speech.wav -c:a aac -b:a 64k speech.aac",
+    "flac": "ffmpeg -i speech.wav -c:a flac speech.flac",
+    "ogg": "ffmpeg -i speech.wav -c:a libvorbis -q:a 4 speech.ogg",
+    "opus": "ffmpeg -i speech.wav -c:a libopus -b:a 32k speech.opus",
+    "m4a": "ffmpeg -i speech.wav -c:a aac -b:a 64k speech.m4a",
+    "mp3WithoutGaplessTag": "ffmpeg -i speech.wav -c:a libmp3lame -b:a 64k -write_xing 0 speech-no-xing.mp3"
+  },
+  "files": [
+    {
+      "path": "proposal-300.wav",
+      "size": 1551934,
+      "sha256": "297bf43cff9058ebc00bf84056bbb1058d98a0526f8c82a37fb2f3576759ece9"
+    },
+    {
+      "path": "speech-no-xing.mp3",
+      "size": 69740,
+      "sha256": "f8a70ac693c04aa5534b591df7652da7aeec632d0b20a21b7523eec73543d87f"
+    },
+    {
+      "path": "speech.aac",
+      "size": 77290,
+      "sha256": "022df30693ad38e00541080c14b22d9b1d3d9e739bc1b33862745ca716ff74b2"
+    },
+    {
+      "path": "speech.flac",
+      "size": 171607,
+      "sha256": "3d81b0aca816c3bb49ae984ba091a81e0a418a9f02bbf57985acb622213db66b"
+    },
+    {
+      "path": "speech.m4a",
+      "size": 77688,
+      "sha256": "c05687ad60ed0f0656d435479ad3740c4b78e4c95863ce1d04f7fae04a184b3f"
+    },
+    {
+      "path": "speech.mp3",
+      "size": 70028,
+      "sha256": "820762d831948f869e3baa2bdb7514c7b701118fa7634adc8ce740300d8109a6"
+    },
+    {
+      "path": "speech.ogg",
+      "size": 47414,
+      "sha256": "8be6ca9ebe263acf2f51f71ce82e6a120d0117e66f6aa63ec6b93d7d87f3d8a2"
+    },
+    {
+      "path": "speech.opus",
+      "size": 32602,
+      "sha256": "50f82a5611c6bfbdb68363314114c129ea7d4fbe2a2b90e3360bd2621ffacef8"
+    },
+    {
+      "path": "speech.wav",
+      "size": 276022,
+      "sha256": "857b629b6e6cbd1c47bd6cabca8c1586815315710a19b0a82e03c7cf98e221b1"
+    }
+  ],
+  "additionalRecordings": [
+    {
+      "path": "proposal-300.wav",
+      "reference": "The proposed budget is three hundred units. The review is on October thirteen. Approval is still pending. The rollout must not start yet.",
+      "origin": "Synthetic macOS Samantha speech at 145 words/minute. Stereo 44.1 kHz conversion exercises downmix and resampling.",
+      "generationCommands": [
+        "say -v Samantha -r 145 -o audio-proposal.aiff <reference>",
+        "ffmpeg -i audio-proposal.aiff -ar 44100 -ac 2 proposal-300.wav"
+      ]
+    }
+  ]
+}

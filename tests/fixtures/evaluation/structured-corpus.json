@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "mind-map-supported",
+      "kind": "mind-map",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Compare both proposals, database recommendations, scope and proposed delivery dates. Preserve attribution. Organize a map with separate attributed proposal branches and cited relationships; preserve each recommendation and scope."
+    },
+    {
+      "id": "mind-map-sparse",
+      "kind": "mind-map",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "sparse",
+          "title": "Single fact",
+          "text": "The proposed database is SQLite."
+        }
+      ],
+      "question": "Use only the one distinct stated fact. A single cited root is enough. Do not invent branches or causal relationships to pad the map."
+    },
+    {
+      "id": "mind-map-conflicting",
+      "kind": "mind-map",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Planning memo A",
+          "text": "Project Atlas proposes October 20 as its launch date, conditional on the security audit passing."
+        },
+        {
+          "id": "b",
+          "title": "Planning memo B",
+          "text": "Project Atlas proposes November 15 as its launch date, subject to final approval. No memo is designated authoritative."
+        }
+      ],
+      "question": "Represent both differing proposed launch dates for Project Atlas. Attribute each to its memo and preserve its conditions; do not choose a winner or merge the dates. Use separate attributed branches for the two proposals."
+    },
+    {
+      "id": "mind-map-unanswerable",
+      "kind": "mind-map",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "The CEO's private bank account number is absent. Return insufficient evidence rather than inventing a map or table containing that number."
+    },
+    {
+      "id": "data-table-supported",
+      "kind": "data-table",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "Compare both proposals, database recommendations, scope and proposed delivery dates. Preserve attribution. Use columns with IDs database, scope, date, budget and rows for Proposal A and Proposal B. Neither source states a budget; show missing budget cells rather than guessing."
+    },
+    {
+      "id": "data-table-sparse",
+      "kind": "data-table",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "sparse",
+          "title": "Single fact",
+          "text": "The proposed database is SQLite."
+        }
+      ],
+      "question": "Use only the one distinct stated fact. Include one row with columns IDs database and budget. Budget is absent; its cell must be empty with a visible limitation."
+    },
+    {
+      "id": "data-table-conflicting",
+      "kind": "data-table",
+      "expectedStatus": "answered",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Planning memo A",
+          "text": "Project Atlas proposes October 20 as its launch date, conditional on the security audit passing."
+        },
+        {
+          "id": "b",
+          "title": "Planning memo B",
+          "text": "Project Atlas proposes November 15 as its launch date, subject to final approval. No memo is designated authoritative."
+        }
+      ],
+      "question": "Represent both differing proposed launch dates for Project Atlas. Attribute each to its memo and preserve its conditions; do not choose a winner or merge the dates. Use one row per memo."
+    },
+    {
+      "id": "data-table-unanswerable",
+      "kind": "data-table",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "a",
+          "title": "Proposal A",
+          "text": "Proposal A recommends SQLite for the first local notebook release. It uses one database file and a local browser interface. The proposed delivery date is October 20.\n"
+        },
+        {
+          "id": "b",
+          "title": "Proposal B",
+          "text": "Proposal B recommends PostgreSQL for a hosted team notebook. It requires a database service and user accounts. The proposed delivery date is November 15.\n"
+        }
+      ],
+      "question": "The CEO's private bank account number is absent. Return insufficient evidence rather than inventing a map or table containing that number."
+    }
+  ]
+}

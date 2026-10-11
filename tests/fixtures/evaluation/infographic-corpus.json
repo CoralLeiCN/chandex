@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "conditional-cards",
+      "expectedStatus": "answered",
+      "expectedLayout": "cards",
+      "sources": [
+        {
+          "id": "proposal",
+          "title": "Proposal",
+          "text": "Zoë proposes a €240 budget, conditional on reviewer approval. The date is not confirmed. No launch commitment has been made."
+        }
+      ],
+      "question": "Create a concise unordered cards infographic about the proposal. Preserve conditional approval, unconfirmed date and lack of launch commitment. Do not invent steps.",
+      "requiredPatterns": [
+        "Zoë",
+        "€240",
+        "approval",
+        "not confirmed",
+        "No launch|not.*launch"
+      ],
+      "maxCards": 3
+    },
+    {
+      "id": "conflicting-comparison",
+      "expectedStatus": "answered",
+      "expectedLayout": "comparison",
+      "sources": [
+        {
+          "id": "memo-a",
+          "title": "Memo A",
+          "text": "Memo A proposes a €240 budget and says the date is not confirmed. It does not claim approval."
+        },
+        {
+          "id": "memo-b",
+          "title": "Memo B",
+          "text": "Memo B proposes a €310 budget and calls the date tentative. It does not claim approval. Neither memo is authoritative over the other."
+        }
+      ],
+      "question": "Compare the two attributed proposals as exactly two infographic positions. Preserve both amounts, date uncertainty and no approval. Do not average or choose a winner.",
+      "requiredPatterns": [
+        "Memo A",
+        "Memo B",
+        "€240",
+        "€310",
+        "not confirmed",
+        "tentative"
+      ],
+      "maxCards": 2
+    },
+    {
+      "id": "supported-steps",
+      "expectedStatus": "answered",
+      "expectedLayout": "steps",
+      "sources": [
+        {
+          "id": "process",
+          "title": "Review process",
+          "text": "The review process has this order: first record the proposal, then ask the reviewer for approval, and only after approval schedule the work. If approval is refused, do not schedule the work. There is no promised completion date."
+        }
+      ],
+      "question": "Create process steps only for the stated sequence. Include a separate factual source-supported order statement. Preserve the approval requirement, refusal condition and no promised completion date.",
+      "requiredPatterns": [
+        "record",
+        "reviewer",
+        "approval",
+        "schedule",
+        "refus|not approved|denied"
+      ],
+      "maxCards": 3
+    },
+    {
+      "id": "sparse-no-order",
+      "expectedStatus": "answered",
+      "expectedLayout": "cards",
+      "sources": [
+        {
+          "id": "observation",
+          "title": "Observation",
+          "text": "The observer recorded a green door. The observation gives no dates or process order."
+        }
+      ],
+      "question": "Create an infographic about the green door. Use unordered cards because evidence does not support steps. Keep it sparse and disclose what the observation cannot establish.",
+      "requiredPatterns": ["green door"],
+      "maxCards": 1,
+      "requiresWarning": true
+    },
+    {
+      "id": "unknown-budget",
+      "expectedStatus": "insufficient_evidence",
+      "sources": [
+        {
+          "id": "observation",
+          "title": "Observation",
+          "text": "The observer recorded a green door."
+        }
+      ],
+      "question": "Create an infographic with the approved budget and actual launch date. If sources do not state these, abstain with notice blocks and no cards.",
+      "requiredPatterns": [],
+      "maxCards": 0
+    }
+  ]
+}

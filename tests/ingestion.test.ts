@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { extract } from "../src/ingestion/extract.ts";
 import { extractIsolated } from "../src/ingestion/service.ts";
 import { publicAddress, fetchPublic } from "../src/ingestion/url.ts";
@@ -54,6 +56,37 @@ test("HTML extraction retains article text and does not execute scripts", async 
   assert.match(r.sections[0].text, /Evidence belongs/);
   assert.ok(!r.sections[0].text.includes("EXECUTED"));
 });
+test("very long Markdown headings keep full evidence without multiplying locator size", async () => {
+  const heading = "🦉".repeat(12000);
+  const text = "# " + heading + "\nFull heading evidence.";
+  const result = await extract(Buffer.from(text), "markdown");
+  assert.equal(result.sections[0].text, text);
+  assert.equal(Array.from(result.sections[0].locator).length, 256);
+  assert.equal(result.sections[0].locator.endsWith("…"), true);
+  assert.match(result.warnings[0], /complete headings remain/);
+});
+test("isolated parser diagnostics do not forward document canaries to application output", async () => {
+  const script = `import {extractIsolated} from './src/ingestion/service.ts';
+    try { await extractIsolated(Buffer.from('%PDF-SRC42XY\\n'), 'pdf'); }
+    catch(error) { console.log('IMPORT_FAILED: ' + error.message); }`;
+  const control = await promisify(execFile)(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs'; const task=getDocument({data:new Uint8Array(Buffer.from('%PDF-SRC42XY\\n'))});try{await task.promise}catch{}finally{await task.destroy()}`,
+    ],
+    { cwd: process.cwd() },
+  );
+  assert.match(control.stdout + control.stderr, /SRC42XY/);
+  const { stdout, stderr } = await promisify(execFile)(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    { cwd: process.cwd() },
+  );
+  assert.match(stdout, /IMPORT_FAILED/);
+  assert.doesNotMatch(stdout + stderr, /SRC42XY/);
+});
 test("isolated extraction worker handles a real text import", async () => {
   const result = await extractIsolated(
     Buffer.from("Worker evidence 🦉"),
@@ -93,4 +126,61 @@ test("text PDF extraction preserves page locator and rejects pages with no text"
   assert.equal(result.sections[0].locator, "Page 1");
   assert.match(result.sections[0].text, /PDF source evidence/);
   await assert.rejects(extract(pdf(""), "pdf"), /No usable text/);
+});
+
+test("malformed UTF-8, hostile binary and extraction size limits fail explicitly", async () => {
+  await assert.rejects(
+    extract(Buffer.from([0xc3, 0x28]), "text"),
+    /encoded data/,
+  );
+  await assert.rejects(
+    extract(Buffer.alloc(25 * 1024 * 1024 + 1), "text"),
+    /25 MiB/,
+  );
+  await assert.rejects(
+    extract(Buffer.from("🦉".repeat(500001)), "text"),
+    /500,000/,
+  );
+  const unicode = await extract(Buffer.from("e\u0301\r\n🦉"), "text");
+  assert.equal(unicode.sections[0].text, "é\n🦉");
+  await assert.rejects(extract(Buffer.from("%PDF-broken"), "pdf"));
+});
+
+import { textPdf } from "./fixtures/pdf.ts";
+test("multi-page PDF retains ordered page text, headings and tabular evidence", async () => {
+  const pages = Array.from({ length: 12 }, (_, index) => [
+    `Report page ${index + 1}`,
+    "Database | Budget | Delivery",
+    `SQLite | ${100 + index} units | October ${index + 1}`,
+    "A paragraph about citations and reproducible source evidence.",
+    "Appendix (qualifiers): budgets are provisional, not commitments.",
+  ]);
+  const result = await extractIsolated(textPdf(pages), "pdf");
+  assert.equal(result.sections.length, pages.length);
+  assert.deepEqual(result.warnings, []);
+  for (const [index, page] of pages.entries()) {
+    assert.equal(result.sections[index].locator, `Page ${index + 1}`);
+    for (const line of page)
+      assert.ok(result.sections[index].text.includes(line), line);
+    assert.ok(
+      result.sections[index].text.indexOf(page[0]) <
+        result.sections[index].text.indexOf(page[4]),
+    );
+  }
+});
+
+test("HTML keeps qualifiers and Unicode but excludes executable and navigational content", async () => {
+  const paragraphs = Array.from(
+    { length: 8 },
+    (_, index) =>
+      `<p>Finding ${index}: Evidence 🦉 supports the pilot, subject to review and a provisional budget. This is a synthetic research article with enough context for extraction.</p>`,
+  );
+  const html = `<html><head><title>Qualified report</title></head><body><nav>UNRELATED_NAVIGATION</nav><article><h1>Qualified report</h1>${paragraphs.join("")}<script>EXECUTABLE_PAYLOAD</script><iframe src="http://127.0.0.1/private"></iframe></article></body></html>`;
+  const result = await extractIsolated(Buffer.from(html), "html");
+  const text = result.sections.map((s) => s.text).join("\n");
+  for (let index = 0; index < 8; index++)
+    assert.ok(text.includes(`Finding ${index}: Evidence 🦉`));
+  assert.ok(text.includes("subject to review and a provisional budget"));
+  assert.ok(!text.includes("EXECUTABLE_PAYLOAD"));
+  assert.ok(!text.includes("UNRELATED_NAVIGATION"));
 });
