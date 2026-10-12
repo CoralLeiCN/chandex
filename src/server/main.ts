@@ -762,6 +762,34 @@ const server = http.createServer(async (req, res) => {
         return;
       }
     }
+    if (p[3] === "drafts") {
+      if (p.length === 4 && method === "GET") {
+        json(
+          res,
+          200,
+          store.drafts.list(n, url.searchParams.get("artifactId")),
+        );
+        return;
+      }
+      if (p.length === 5 && method === "GET") {
+        json(res, 200, store.drafts.read(n, p[4]));
+        return;
+      }
+      if (p.length === 5 && method === "PUT") {
+        json(
+          res,
+          200,
+          store.drafts.save(n, p[4], await body(req, 2 * 1024 * 1024)),
+        );
+        return;
+      }
+      if (p.length === 5 && method === "DELETE") {
+        const b = await body(req, 1024);
+        store.drafts.discard(n, { id: p[4], version: b.version });
+        json(res, 200, { discarded: true });
+        return;
+      }
+    }
     if (p[3] === "artifacts") {
       if (p.length === 4 && method === "POST") {
         const b = await body(req);
@@ -788,7 +816,14 @@ const server = http.createServer(async (req, res) => {
         json(res, 201, {
           id:
             b.document !== undefined
-              ? store.createRichArtifact(n, title(b.title), b.document)
+              ? store.drafts.publish(n, b.draft, null, null, (draft) =>
+                  store.createRichArtifact(
+                    n,
+                    title(b.title),
+                    b.document,
+                    noteCitations(draft?.document ?? {}),
+                  ),
+                )
               : store.saveArtifact(
                   n,
                   title(b.title),
@@ -966,12 +1001,20 @@ const server = http.createServer(async (req, res) => {
       if (p.length === 5 && method === "PATCH") {
         const b = await body(req);
         if (b.document !== undefined)
-          store.editRichArtifact(
+          store.drafts.publish(
             n,
+            b.draft,
             a.id,
-            title(b.title),
-            b.document,
             string(b.baseRevisionId, 100),
+            (draft) =>
+              store.editRichArtifact(
+                n,
+                a.id,
+                title(b.title),
+                b.document,
+                string(b.baseRevisionId, 100),
+                noteCitations(draft?.document ?? {}),
+              ),
           );
         else
           store.editArtifact(

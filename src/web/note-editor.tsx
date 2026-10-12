@@ -116,6 +116,9 @@ export function RichNoteEditor({
   onSave,
   onReload,
   onDraftState,
+  onChange,
+  recovered = false,
+  blocked = false,
   availability = {},
 }: {
   initial: any;
@@ -125,6 +128,9 @@ export function RichNoteEditor({
   onSave: (title: string, document: RichNote) => Promise<void>;
   onReload?: () => Promise<void>;
   onDraftState?: (state: NoteDraftState) => void;
+  onChange?: (title: string, document: RichNote, changed: boolean) => void;
+  recovered?: boolean;
+  blocked?: boolean;
   availability?: Record<string, boolean>;
 }) {
   const [title, setTitle] = useState(initialTitle),
@@ -224,11 +230,25 @@ export function RichNoteEditor({
       editor.off("update", update);
     };
   }, [editor]);
-  const changed = title !== initialTitle || documentChanged;
+  const changed = recovered || title !== initialTitle || documentChanged;
+  useEffect(() => {
+    if (editor && !start.error && !saving && !blocked)
+      onChange?.(
+        title,
+        {
+          format: "rich-note",
+          version: 1,
+          doc: editor.getJSON() as NoteNode,
+        },
+        changed,
+      );
+  });
   useLayoutEffect(() => {
     onDraftState?.({ changed, saving });
   }, [changed, saving, onDraftState]);
-  useEffect(() => () => onDraftState?.(cleanNoteDraft), [onDraftState]);
+  const draftStateCallback = useRef(onDraftState);
+  draftStateCallback.current = onDraftState;
+  useEffect(() => () => draftStateCallback.current?.(cleanNoteDraft), []);
   useEffect(() => {
     if (!changed && !saving) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -239,8 +259,11 @@ export function RichNoteEditor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [changed, saving]);
   useEffect(() => {
-    editor?.setEditable(!saving);
-  }, [editor, saving]);
+    editor?.setEditable(!saving && !blocked);
+  }, [editor, saving, blocked]);
+  useEffect(() => {
+    if (editor && recovered) editor.commands.focus("end");
+  }, [editor, recovered]);
   useEffect(() => {
     if (!source) {
       setPassages([]);
@@ -281,7 +304,7 @@ export function RichNoteEditor({
       type="button"
       className="small"
       aria-pressed={active}
-      disabled={disabled || saving}
+      disabled={disabled || saving || blocked}
       key={label}
       onClick={action}
     >
@@ -292,6 +315,7 @@ export function RichNoteEditor({
     <form
       onSubmit={(event) => {
         event.preventDefault();
+        if (saving || blocked) return;
         setError("");
         try {
           if (start.error) throw new Error(start.error);
@@ -343,6 +367,7 @@ export function RichNoteEditor({
         Title
         <input
           value={title}
+          disabled={saving || blocked}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
           required
@@ -591,7 +616,7 @@ export function RichNoteEditor({
         {authoredReferenceNotice} Paste inserts plain text. Use the formatting
         controls or keyboard shortcuts; Backspace removes a selected reference.
       </p>
-      <button className="primary" disabled={saving || !!start.error}>
+      <button className="primary" disabled={saving || blocked || !!start.error}>
         {saving ? "Saving…" : "Save note"}
       </button>
     </form>

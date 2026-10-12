@@ -4,13 +4,29 @@ import React, { act, useState } from "react";
 import { JSDOM } from "jsdom";
 import type { Editor } from "@tiptap/core";
 import type { RichNote } from "../src/domain/notes.ts";
+import type { DraftReference } from "../src/domain/note-drafts.ts";
+import { Store } from "../src/storage/store.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import { editableNote, richNote } from "../src/domain/notes.ts";
+import { richFixture } from "./fixtures/notes.ts";
 import { voiceEnvironment } from "./fixtures/voice-capture.ts";
 
 async function fixture(
   options: {
-    save?: (title: string, document: RichNote) => Promise<void>;
+    save?: (
+      title: string,
+      document: RichNote,
+      context?: { baseRevisionId: string | null; draft?: DraftReference },
+    ) => Promise<void>;
     module?: () => Promise<void>;
     text?: string;
+    recovery?: boolean;
+    fetch?: typeof fetch;
+    notebookId?: string;
+    artifactId?: string;
+    baseRevisionId?: string;
+    initial?: unknown;
   } = {},
 ) {
   const dom = new JSDOM('<div id="app"></div>', {
@@ -38,9 +54,11 @@ async function fixture(
     },
     cancelAnimationFrame: () => {},
     IS_REACT_ACT_ENVIRONMENT: true,
-    fetch: async () => {
-      throw Error("No request should be made in these draft checks.");
-    },
+    fetch:
+      options.fetch ??
+      (async () => {
+        throw Error("No request should be made in these draft checks.");
+      }),
   };
   const originals = new Map(
     Object.keys(values).map((name) => [
@@ -72,6 +90,8 @@ async function fixture(
     const { createRoot } = await import("react-dom/client"),
       { RichNoteEditor } = await import("../src/web/note-editor.tsx"),
       { NoteEditorDialog } = await import("../src/web/note-dialog.tsx"),
+      { RecoverableNoteEditor } =
+        await import("../src/web/recoverable-note-editor.tsx"),
       container = dom.window.document.getElementById("app")!,
       root = createRoot(container);
     unmount = async () => {
@@ -88,19 +108,34 @@ async function fixture(
               closes++;
               setOpen(false);
             },
-            children: (onDraftState) =>
-              React.createElement(RichNoteEditor, {
-                initial: { text: options.text ?? "Original note 🦉" },
+            children: (onDraftState) => {
+              const props = {
+                initial: options.initial ?? {
+                  text: options.text ?? "Original note 🦉",
+                },
                 initialTitle: "Original title",
                 sources: [],
-                notebookId: "notebook",
+                notebookId: options.notebookId ?? "notebook",
+                artifactId: options.artifactId ?? null,
+                baseRevisionId: options.baseRevisionId ?? null,
                 onDraftState,
-                onSave: async (title, document) => {
+                onSave: async (
+                  title: string,
+                  document: RichNote,
+                  context?: {
+                    baseRevisionId: string | null;
+                    draft?: DraftReference;
+                  },
+                ) => {
                   saves++;
-                  await options.save?.(title, document);
+                  await options.save?.(title, document, context);
                   setOpen(false);
                 },
-              }),
+              };
+              return options.recovery
+                ? React.createElement(RecoverableNoteEditor, props)
+                : React.createElement(RichNoteEditor, props);
+            },
           })
         : React.createElement("p", {}, "Editor closed");
     }
@@ -140,14 +175,15 @@ async function fixture(
       dom.window.dispatchEvent(event);
       return event.defaultPrevented;
     };
-    const editor = (
-      container.querySelector('[aria-label="Note body"]') as HTMLElement & {
-        editor: Editor;
-      }
-    ).editor;
+    const getEditor = () =>
+      (
+        container.querySelector('[aria-label="Note body"]') as HTMLElement & {
+          editor: Editor;
+        }
+      ).editor;
     const escapeBody = async () => {
       await act(async () => {
-        editor.view.dom.dispatchEvent(
+        getEditor().view.dom.dispatchEvent(
           new dom.window.KeyboardEvent("keydown", {
             key: "Escape",
             bubbles: true,
@@ -159,7 +195,9 @@ async function fixture(
     return {
       container,
       environment,
-      editor,
+      get editor() {
+        return getEditor();
+      },
       click,
       title,
       cancel,
@@ -167,6 +205,12 @@ async function fixture(
       warned,
       closes: () => closes,
       saves: () => saves,
+      leave: async () => {
+        await act(async () => {
+          dom.window.dispatchEvent(new dom.window.Event("pagehide"));
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+      },
       close: restore,
     };
   } catch (error) {
@@ -224,6 +268,197 @@ test("clean notes close immediately; changed title/body ask, keep focus and reta
     assert.equal(ui.closes(), 1);
   } finally {
     await ui.close();
+  }
+});
+
+function draftApi(
+  store: Store,
+  offline: () => boolean = () => false,
+): typeof fetch {
+  return async (input, init) => {
+    const url = new URL(String(input), "http://127.0.0.1:4317"),
+      p = url.pathname.split("/");
+    assert.equal(p[4], "drafts");
+    const n = p[3],
+      id = p[5],
+      b = init?.body ? JSON.parse(String(init.body)) : null;
+    if (offline() && init?.method === "PUT")
+      throw Error("Connection unavailable");
+    try {
+      let result;
+      if (init?.method === "PUT") result = store.drafts.save(n, id, b);
+      else if (init?.method === "DELETE") {
+        store.drafts.discard(n, { id, version: b.version });
+        result = { discarded: true };
+      } else
+        result = id
+          ? store.drafts.read(n, id)
+          : store.drafts.list(n, url.searchParams.get("artifactId"));
+      return new Response(JSON.stringify(result), { status: 200 });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: (e as Error).message }), {
+        status: 400,
+      });
+    }
+  };
+}
+
+test("automatic drafts recover rich content after editor restart, then explicit Save publishes and clears recovery", async () => {
+  const root = mkdtempSync(os.tmpdir() + "/codeboom-draft-ui-");
+  const store = new Store(root),
+    n = store.createNotebook("Personal").id;
+  let ui: Awaited<ReturnType<typeof fixture>> | undefined;
+  try {
+    const options = { recovery: true, notebookId: n, fetch: draftApi(store) };
+    ui = await fixture(options);
+    await ui.title("Recovered title");
+    await act(async () => {
+      ui!.editor.commands.setContent(richNote(richFixture()).doc);
+    });
+    const expected = richNote({
+      format: "rich-note",
+      version: 1,
+      doc: ui.editor.getJSON(),
+    });
+    await ui.leave();
+    assert.equal(store.view(n).artifacts.length, 0);
+    assert.equal(store.view(n).drafts.length, 1);
+    await ui.close();
+    ui = undefined;
+    ui = await fixture({
+      ...options,
+      save: async (title, doc, context) => {
+        store.drafts.publish(n, context!.draft, null, null, () =>
+          store.createRichArtifact(n, title, doc),
+        );
+      },
+    });
+    assert.match(ui.container.textContent!, /Unsaved drafts are available/);
+    await ui.click("Recover draft");
+    assert.equal(ui.container.querySelector("input")!.value, "Recovered title");
+    assert.equal(
+      ui.container.ownerDocument.activeElement?.getAttribute("aria-label"),
+      "Note body",
+    );
+    assert.deepEqual(
+      richNote({ format: "rich-note", version: 1, doc: ui.editor.getJSON() }),
+      expected,
+    );
+    assert.equal(ui.warned(), true);
+    await ui.click("Save note");
+    assert.equal(store.view(n).artifacts.length, 1);
+    assert.equal(store.view(n).drafts.length, 0);
+    assert.deepEqual(store.view(n).artifacts[0].content, expected);
+  } finally {
+    await ui?.close();
+    store.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("automatic draft failure is visible and retryable; explicit Discard clears the stored draft", async () => {
+  const root = mkdtempSync(os.tmpdir() + "/codeboom-draft-failure-ui-");
+  const store = new Store(root),
+    n = store.createNotebook("Personal").id;
+  let offline = true;
+  const ui = await fixture({
+    recovery: true,
+    notebookId: n,
+    fetch: draftApi(store, () => offline),
+  });
+  try {
+    await ui.title("Do not lose this");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
+    assert.match(
+      ui.container.textContent!,
+      /Draft recovery could not be updated/,
+    );
+    assert.equal(
+      ui.container.querySelector("input")!.value,
+      "Do not lose this",
+    );
+    assert.equal(store.view(n).drafts.length, 0);
+    offline = false;
+    await ui.click("Retry draft saving");
+    assert.equal(store.view(n).drafts.length, 1);
+    await ui.click("Close dialog");
+    await ui.click("Keep editing");
+    assert.equal(store.view(n).drafts.length, 1);
+    await ui.click("Close dialog");
+    await ui.click("Discard draft");
+    assert.equal(store.view(n).drafts.length, 0);
+    assert.equal(store.view(n).artifacts.length, 0);
+    assert.match(ui.container.textContent!, /Editor closed/);
+  } finally {
+    await ui.close();
+    store.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("recovered drafts retain their original base and survive failed or stale Save", async () => {
+  const root = mkdtempSync(os.tmpdir() + "/codeboom-draft-stale-ui-");
+  const store = new Store(root),
+    n = store.createNotebook("Personal").id;
+  const note = store.createRichArtifact(
+    n,
+    "Original title",
+    editableNote({ text: "Original" }),
+  );
+  const base = store.view(n).artifacts[0].revision_id;
+  store.drafts.save(n, "recover-me", {
+    artifactId: note,
+    baseRevisionId: base,
+    title: "My draft",
+    document: editableNote({ text: "My unfinished changes" }),
+    version: 1,
+  });
+  store.editRichArtifact(
+    n,
+    note,
+    "Original title",
+    editableNote({ text: "Newer saved version" }),
+    base,
+  );
+  const current = store.view(n).artifacts[0];
+  let saves = 0;
+  const ui = await fixture({
+    recovery: true,
+    notebookId: n,
+    artifactId: note,
+    baseRevisionId: current.revision_id,
+    initial: current.content,
+    fetch: draftApi(store),
+    save: async (title, doc, context) => {
+      if (++saves === 1) throw Error("Temporary publication failure");
+      store.drafts.publish(
+        n,
+        context!.draft,
+        note,
+        context!.baseRevisionId,
+        () =>
+          store.editRichArtifact(n, note, title, doc, context!.baseRevisionId!),
+      );
+    },
+  });
+  try {
+    await ui.click("Recover draft");
+    assert.match(ui.container.textContent!, /older saved revision/);
+    assert.equal(ui.editor.getText(), "My unfinished changes");
+    await ui.click("Save note");
+    assert.match(ui.container.textContent!, /Temporary publication failure/);
+    assert.equal(store.view(n).drafts.length, 1);
+    await ui.click("Save note");
+    assert.match(ui.container.textContent!, /Note changed/);
+    assert.equal(ui.editor.getText(), "My unfinished changes");
+    assert.equal(store.view(n).artifacts[0].revision_id, current.revision_id);
+    assert.equal(store.drafts.read(n, "recover-me").baseRevisionId, base);
+  } finally {
+    await ui.close();
+    store.close();
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

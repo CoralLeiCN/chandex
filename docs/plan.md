@@ -160,6 +160,8 @@ Use synthetic or redistributable fixtures. Keep deterministic validation separat
 
 The following are outside first-release completion:
 
+- [x] PN1 Recoverable note drafts: local SQLite autosave, visible recovery for new/existing notes, separate drafts for concurrent edits, explicit Save/Discard cleanup and original-revision conflict protection. Restart/backup, storage/API and editor lifecycle checks are recorded in [verification](verification.md#recoverable-note-drafts-2026-10-12). See [acceptance criteria](spec.md#recoverable-note-drafts).
+- [ ] PN2 Individual note deletion and Trash: move a single note to Trash, restore it with its history and references, and offer explicit permanent deletion. Define effects on promoted sources, pinned note conversations and retained evidence before implementation. See [planned acceptance criteria](spec.md#individual-note-deletion-and-trash-backlog).
 - Notebook tags/templates/cross-notebook discovery: implemented local prototype with bounded migration/API/browser checks; release acceptance remains open.
 - Rich note editing: implemented local prototype with formatting, attached references, immutable history and authored restoration; human/release qualification remains open.
 - Publishing integrations from spec §2 are user-deferred (2026-10-10).
@@ -171,6 +173,8 @@ The following are outside first-release completion:
 - Generated audio scripts/speech and video output: user-deferred. Slides and infographics: implemented local prototypes with lifecycle/native/browser qualification; human and broader rendering acceptance remain open.
 - Explicit web-assisted research: implemented query-only candidate discovery and selected dated snapshot imports; ordinary questions remain source-only. Human relevance/representative-site/release qualification remains open.
 - **Deferred by the user:** hosting, account management, sharing, collaboration, and connector synchronization.
+
+PN1 and PN2 were added at the user's request on 2026-10-12. PN1 was subsequently requested and implemented; PN2 remains in the backlog and is not scheduled.
 
 Before implementing an extension, define its user acceptance criteria in the spec and its technical implications in the decision record.
 

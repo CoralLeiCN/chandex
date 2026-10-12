@@ -381,7 +381,7 @@ test("Drive provenance survives restart/backup/restore without credentials and p
     const manifest = JSON.parse(
       readFileSync(join(target, "manifest.json"), "utf8"),
     );
-    assert.equal(manifest.schema, 16);
+    assert.equal(manifest.schema, 17);
     restore(target, restored);
     assert.doesNotMatch(
       readFileSync(join(target, "codeboom.sqlite")).toString(),

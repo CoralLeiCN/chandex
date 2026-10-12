@@ -20,6 +20,7 @@ import {
   validateAnswer,
   type Passage,
   type Answer,
+  type Citation,
 } from "../domain/evidence.ts";
 import type { Extracted } from "../ingestion/extract.ts";
 import { EXTRACTION_VERSION } from "../ingestion/version.ts";
@@ -45,6 +46,7 @@ import {
   type NoteNode,
 } from "../domain/notes.ts";
 import { SpeechStore } from "./speech-store.ts";
+import { NoteDraftStore } from "./note-draft-store.ts";
 import {
   safeDriveProvenance,
   type DriveProvenance,
@@ -64,6 +66,7 @@ export class Store {
   readonly db: DatabaseSync;
   readonly blobs: string;
   readonly speech: SpeechStore;
+  readonly drafts: NoteDraftStore;
   constructor(readonly root: string) {
     mkdirSync(root, { recursive: true, mode: 0o700 });
     this.blobs = path.join(root, "blobs");
@@ -243,6 +246,17 @@ export class Store {
         // The current source kind does not identify earlier revisions after a
         // URL refresh changes format. Leave those historical kinds unknown.
       });
+    if (!this.one("SELECT version FROM migrations WHERE version=17"))
+      this.tx(() => {
+        this.db.exec(`CREATE TABLE note_drafts(
+          id TEXT PRIMARY KEY, notebook_id TEXT NOT NULL REFERENCES notebooks(id) ON DELETE CASCADE,
+          artifact_id TEXT REFERENCES artifacts(id) ON DELETE CASCADE,
+          base_revision_id TEXT REFERENCES artifact_revisions(id), version INTEGER NOT NULL,
+          title TEXT NOT NULL, document TEXT, updated TEXT NOT NULL, closed INTEGER NOT NULL DEFAULT 0
+        ); CREATE INDEX note_drafts_notebook ON note_drafts(notebook_id,artifact_id,closed);
+        INSERT INTO migrations VALUES(17);`);
+      });
+    this.drafts = new NoteDraftStore(this);
     this.speech = new SpeechStore(this);
     this.run(
       "UPDATE speech_jobs SET status='interrupted',error='Speech rendering was interrupted. Retry explicitly.',ended=? WHERE status='processing'",
@@ -1514,8 +1528,17 @@ export class Store {
       return null;
     }
   }
-  createRichArtifact(n: string, title: string, value: unknown) {
-    const content = richNote(value, (id) => this.resolveNotePassage(n, id));
+  createRichArtifact(
+    n: string,
+    title: string,
+    value: unknown,
+    inherited: Citation[] = [],
+  ) {
+    const content = richNote(
+      value,
+      (id) => this.resolveNotePassage(n, id),
+      inherited,
+    );
     return this.saveArtifact(n, title, "note", JSON.stringify(content), true);
   }
   editRichArtifact(
@@ -1524,6 +1547,7 @@ export class Store {
     title: string,
     value: unknown,
     base: string,
+    inherited: Citation[] = [],
   ) {
     return this.tx(() => {
       const current = this.one(
@@ -1535,11 +1559,10 @@ export class Store {
       if (!base || current.revision !== base)
         throw new Error("Note changed. Reopen it before saving this edit.");
       const content = JSON.stringify(
-        richNote(
-          value,
-          (id) => this.resolveNotePassage(n, id),
-          noteCitations(parse(current.content)),
-        ),
+        richNote(value, (id) => this.resolveNotePassage(n, id), [
+          ...noteCitations(parse(current.content)),
+          ...inherited,
+        ]),
       );
       // An unchanged rich note is idempotent and does not create a revision.
       if (
@@ -1790,6 +1813,7 @@ export class Store {
     const nb = this.notebook(n);
     return {
       ...nb,
+      drafts: this.drafts.list(n),
       sources: this.all(
         "SELECT s.*,r.warnings,r.hash,r.provider_metadata,CASE WHEN a.run_id IS NOT NULL THEN 'generated' WHEN a.authored=1 THEN 'user' ELSE 'unknown' END AS derived_origin FROM sources s LEFT JOIN revisions r ON r.id=s.current_revision LEFT JOIN artifacts a ON a.id=s.derived_from AND a.notebook_id=s.notebook_id WHERE s.notebook_id=? ORDER BY s.created",
         n,
