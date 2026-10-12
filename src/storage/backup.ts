@@ -47,7 +47,9 @@ export function backup(source: string, target: string) {
     const version = (
       db.prepare("SELECT max(version) AS version FROM migrations").get() as any
     ).version;
-    if (![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(version))
+    if (
+      ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(version)
+    )
       throw new Error("Unsupported database schema.");
     const refs = db
       .prepare(
@@ -107,7 +109,7 @@ export function restore(source: string, target: string) {
   );
   if (
     manifest.format !== 1 ||
-    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(
+    ![3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(
       manifest.schema,
     ) ||
     !manifest.hashes?.["codeboom.sqlite"]

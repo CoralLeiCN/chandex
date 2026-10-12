@@ -377,7 +377,7 @@ test("organization metadata, templates and note search survive restart and stopp
     assert.equal(store.template(t.id).instructions, data.instructions);
     assert.equal(
       store.one("SELECT max(version) AS version FROM migrations").version,
-      16,
+      17,
     );
   } finally {
     store.close();
@@ -402,7 +402,7 @@ test("migration 12 backfills saved notes from a genuine schema-11 shape without 
     );
     const before = store.view(n);
     store.db.exec(
-      "ALTER TABLE revisions DROP COLUMN kind; ALTER TABLE revisions DROP COLUMN provider_metadata; DROP TABLE note_conversations; DROP TABLE speech_assets; DROP TABLE speech_jobs; DROP TRIGGER note_search_insert; DROP TRIGGER note_search_update; DROP TRIGGER note_search_delete; DROP TABLE note_fts; DROP TABLE notebook_templates; ALTER TABLE notebooks DROP COLUMN tags; ALTER TABLE notebooks DROP COLUMN starter_questions; ALTER TABLE notebooks DROP COLUMN template_snapshot; DELETE FROM migrations WHERE version>=12;",
+      "DROP TABLE note_drafts; ALTER TABLE revisions DROP COLUMN kind; ALTER TABLE revisions DROP COLUMN provider_metadata; DROP TABLE note_conversations; DROP TABLE speech_assets; DROP TABLE speech_jobs; DROP TRIGGER note_search_insert; DROP TRIGGER note_search_update; DROP TRIGGER note_search_delete; DROP TABLE note_fts; DROP TABLE notebook_templates; ALTER TABLE notebooks DROP COLUMN tags; ALTER TABLE notebooks DROP COLUMN starter_questions; ALTER TABLE notebooks DROP COLUMN template_snapshot; DELETE FROM migrations WHERE version>=12;",
     );
     store.close();
     store = new Store(f.root);

@@ -232,7 +232,7 @@ for (const legacy of [false, true])
         );
         if (legacy)
           store.db.exec(
-            "ALTER TABLE revisions DROP COLUMN kind; DELETE FROM migrations WHERE version=16;",
+            "ALTER TABLE revisions DROP COLUMN kind; DROP TABLE note_drafts; DELETE FROM migrations WHERE version>=16;",
           );
         store.close();
         backup(data, path.join(root, "backup"));
@@ -240,7 +240,7 @@ for (const legacy of [false, true])
           JSON.parse(
             readFileSync(path.join(root, "backup", "manifest.json"), "utf8"),
           ).schema,
-          legacy ? 15 : 16,
+          legacy ? 15 : 17,
         );
         restore(path.join(root, "backup"), restored);
         store = new Store(restored);
@@ -315,7 +315,7 @@ test("schema 3 backups restore and migrate without losing evidence or completed 
       coverageWarnings: [],
     });
     store.db.exec(
-      "ALTER TABLE revisions DROP COLUMN kind; ALTER TABLE revisions DROP COLUMN provider_metadata; DROP TABLE note_conversations; DROP TABLE speech_assets; DROP TABLE speech_jobs; DROP TRIGGER note_search_insert; DROP TRIGGER note_search_update; DROP TRIGGER note_search_delete; DROP TABLE note_fts; DROP TABLE notebook_templates; ALTER TABLE notebooks DROP COLUMN tags; ALTER TABLE notebooks DROP COLUMN starter_questions; ALTER TABLE notebooks DROP COLUMN template_snapshot;",
+      "DROP TABLE note_drafts; ALTER TABLE revisions DROP COLUMN kind; ALTER TABLE revisions DROP COLUMN provider_metadata; DROP TABLE note_conversations; DROP TABLE speech_assets; DROP TABLE speech_jobs; DROP TRIGGER note_search_insert; DROP TRIGGER note_search_update; DROP TRIGGER note_search_delete; DROP TABLE note_fts; DROP TABLE notebook_templates; ALTER TABLE notebooks DROP COLUMN tags; ALTER TABLE notebooks DROP COLUMN starter_questions; ALTER TABLE notebooks DROP COLUMN template_snapshot;",
     );
     store.db.exec(
       "DROP TABLE quiz_attempts; ALTER TABLE runs DROP COLUMN study_count; ALTER TABLE notebooks DROP COLUMN instruction_version; ALTER TABLE notebooks DROP COLUMN updated; ALTER TABLE runs DROP COLUMN instruction_version; ALTER TABLE runs DROP COLUMN instruction_snapshot; ALTER TABLE runs DROP COLUMN grounding_mode; DROP TRIGGER jobs_lifecycle; DROP INDEX one_import_retry; ALTER TABLE jobs DROP COLUMN type; ALTER TABLE jobs DROP COLUMN input_kind; ALTER TABLE jobs DROP COLUMN input_metadata; ALTER TABLE jobs DROP COLUMN attempt_count; ALTER TABLE jobs DROP COLUMN retry_of; ALTER TABLE jobs DROP COLUMN started; ALTER TABLE jobs DROP COLUMN updated; ALTER TABLE jobs DROP COLUMN ended; ALTER TABLE runs DROP COLUMN error_category; ALTER TABLE runs DROP COLUMN failure_draft; ALTER TABLE sources DROP COLUMN requested_origin; ALTER TABLE revisions DROP COLUMN requested_origin; ALTER TABLE revisions DROP COLUMN retrieved_at; ALTER TABLE jobs DROP COLUMN duplicate_revision; ALTER TABLE revisions DROP COLUMN derived_revision; ALTER TABLE artifact_revisions DROP COLUMN title; DELETE FROM migrations WHERE version>=4",
@@ -332,7 +332,7 @@ test("schema 3 backups restore and migrate without losing evidence or completed 
     store = new Store(path.join(root, "restored"));
     assert.equal(
       store.one("SELECT max(version) AS version FROM migrations").version,
-      16,
+      17,
     );
     assert.equal(
       store.one("SELECT status FROM runs WHERE id=?", r.id).status,

@@ -325,7 +325,7 @@ Later flashcards and quizzes include evidence for answers. Later audio overviews
 
 Provide a local visual editor with paragraphs, headings (levels 1–3), bold/italic/underline/strikethrough, inline/code blocks, bullet/numbered nested lists, quotes, hard breaks, rules and explicit HTTP(S) links. Support selection formatting, undo/redo, keyboard operation, plain-text paste and narrow-screen containment. Store a versioned structured document, never arbitrary executable HTML, remote images or embeds. Bound documents to 100,000 Unicode text characters, 5,000 nodes, depth twelve and one MiB serialized JSON; validation failures leave the saved revision untouched.
 
-Protect unsaved personal-note drafts. Close or Escape asks whether to keep editing or discard when the title/document has changed. Keeping the draft retains its text and returns focus; explicit discard closes the editor. Refuse closing while an explicit save is pending, then retain the draft if saving fails. Warn through the browser's ordinary leave-page prompt while changed text or a save is pending. Undo/reverting to the original title/document removes the unsaved-change warning. This does not automatically persist drafts or recordings; a successful explicit Save remains the publication boundary.
+Protect unsaved personal-note drafts. Close or Escape asks whether to keep editing or discard when the title/document has changed. Keeping the draft retains its text and returns focus; explicit discard closes the editor. Refuse closing while an explicit save is pending, then retain the draft if saving fails. Warn through the browser's ordinary leave-page prompt while changed text or a save is pending. Undo/reverting to the original title/document removes the unsaved-change warning. Local recovery drafts follow the criteria below; a successful explicit Save remains the publication boundary.
 
 Opening a generated output in the editor preserves its text, section/item/map/table labels, inference/gap/coverage qualifications and exact citation attachments. Edits become user-authored and display that attached references have not been semantically revalidated against the edited text. Citations are inline removable/reorderable atoms. Users may attach an exact quote from a stored passage in their notebook; malformed offsets/quotes and foreign IDs are refused. Retained historical references still open their immutable source revision. Existing attached references whose source was purged remain explicitly unavailable; they cannot be forged into new notes or imply current support.
 
@@ -336,6 +336,22 @@ Rich notes participate in local discovery, restart, stopped backup/restore, exac
 Acceptance requires formatting and nested structures, undo/redo and selection handling, legacy/generated conversion across every artifact kind without losing citations/qualifiers, strict shape/link/citation/budget validation, scoped API/history/stale-save/restore behavior, immutable original and promotion ancestry, purge/FTS/restart/backup behavior, and keyboard/desktop/mobile checks. Publishing integrations remain a separate planned extension; human semantic and release gates remain unchanged.
 
 Status, 2026-10-10: the local visual editor, strict validation, history/restoration and export/search/lifecycle integration are implemented. The 131-test suite and bounded desktop/mobile/browser evidence are recorded in verification. Publishing, broader assistive-technology qualification and human release gates remain open.
+
+### Recoverable note drafts
+
+Status, 2026-10-12: PN1 is implemented following the user's request to proceed. See the [verification record](verification.md#recoverable-note-drafts-2026-10-12).
+
+Automatically retain unsaved note titles and editor content locally and offer recovery after reload or a browser crash. Draft persistence must remain separate from published note revisions: explicit Save publishes a revision, and explicit Discard removes the recoverable draft. Recovery must preserve formatting and attached references and must not silently overwrite a saved revision changed in another window. Verify recovery for new and existing notes, successful save/discard cleanup, failed saves and stale-base conflicts. Voice recordings and transient question transcripts remain outside note draft persistence.
+
+Persist after a 400 ms editing pause and report pending, saved or failed recovery status. Recovery guarantees the last acknowledged local save, not unacknowledged keystrokes during a crash or outage. Show recoverable draft titles in Notes & Studio and offer recovery, discard or a separate draft when entering New/Edit. Preserve the original base revision on recovery. Concurrent edits must not silently overwrite another window's draft; retain separate recovery copies when they diverge. Failed publication retains recovery; successful publication clears only its submitted draft version atomically. Undo to the opening saved baseline removes that editor's draft.
+
+Keep up to 50 active recovery drafts per notebook, with existing rich-note document limits and titles of up to 200 Unicode characters (including empty drafts). Drafts are notebook-scoped, included in stopped backup/restore and deleted with the notebook, but excluded from discovery, exports, source selection and model requests. Treat retained draft text as authored content: source purge leaves its attached references visibly unavailable, and new missing or foreign references remain invalid.
+
+### Individual note deletion and Trash (backlog)
+
+Status, 2026-10-12: user-requested backlog item PN2; not implemented or scheduled.
+
+Allow an individual note to be moved to Trash, hidden from ordinary note lists and library results, and restored with its revision history and references. Provide an explicit permanent-delete action with a clear description of its effects. Before implementation, define retention and deletion behavior for promoted source snapshots, pinned note conversations and dependent evidence so moving a note to Trash does not silently break citations. Verify move, restore and permanent deletion, notebook ownership, restart persistence and the agreed dependency behavior.
 
 ### Portable formatted export
 

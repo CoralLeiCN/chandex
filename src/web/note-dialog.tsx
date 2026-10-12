@@ -4,6 +4,7 @@ import { Dialog } from "./dialog.tsx";
 export interface NoteDraftState {
   changed: boolean;
   saving: boolean;
+  discard?: () => Promise<void>;
 }
 export const cleanNoteDraft: NoteDraftState = {
   changed: false,
@@ -22,7 +23,9 @@ export function NoteEditorDialog({
   children: (onDraftState: (state: NoteDraftState) => void) => ReactNode;
 }) {
   const [draft, setDraft] = useState(cleanNoteDraft),
-    [confirm, setConfirm] = useState(false);
+    [confirm, setConfirm] = useState(false),
+    [discarding, setDiscarding] = useState(false),
+    [discardError, setDiscardError] = useState("");
   const keepEditing = useRef<HTMLButtonElement>(null),
     previous = useRef<HTMLElement | null>(null);
   const keep = () => {
@@ -33,7 +36,7 @@ export function NoteEditorDialog({
     if (confirm) keepEditing.current?.focus();
   }, [confirm]);
   const requestClose = () => {
-    if (draft.saving) return;
+    if (draft.saving || discarding) return;
     if (confirm) {
       keep();
       return;
@@ -48,18 +51,24 @@ export function NoteEditorDialog({
       title={title}
       error={error}
       onClose={requestClose}
-      closeDisabled={draft.saving}
+      closeDisabled={draft.saving || discarding}
     >
       {confirm && (
         <section className="note-discard" aria-label="Unsaved note">
           <p role="alert">
             This note has unsaved changes. Keep editing or discard this draft?
           </p>
+          {discardError && (
+            <p role="alert" className="error-bar">
+              {discardError}
+            </p>
+          )}
           <div className="note-discard-actions">
             <button
               type="button"
               className="small"
               ref={keepEditing}
+              disabled={discarding}
               onClick={keep}
             >
               Keep editing
@@ -67,9 +76,16 @@ export function NoteEditorDialog({
             <button
               type="button"
               className="danger small"
-              disabled={draft.saving}
+              disabled={draft.saving || discarding}
               onClick={() => {
-                if (!draft.saving) onClose();
+                if (draft.saving || discarding) return;
+                setDiscarding(true);
+                setDiscardError("");
+                void Promise.resolve()
+                  .then(() => draft.discard?.())
+                  .then(onClose)
+                  .catch((e) => setDiscardError(e.message))
+                  .finally(() => setDiscarding(false));
               }}
             >
               Discard draft

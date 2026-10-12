@@ -1416,6 +1416,7 @@ dialog label select {
   background: #fff;
 }
 .note-discard {
+  overflow-wrap: anywhere;
   border: 1px solid #d3b878;
   border-radius: 8px;
   padding: 12px;

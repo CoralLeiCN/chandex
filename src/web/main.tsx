@@ -28,8 +28,8 @@ import { AudioOverview } from "./audio-overview.tsx";
 import { Dialog } from "./dialog.tsx";
 import { NoteEditorDialog } from "./note-dialog.tsx";
 const RichNoteEditor = lazy(() =>
-  import("./note-editor.tsx").then((module) => ({
-    default: module.RichNoteEditor,
+  import("./recoverable-note-editor.tsx").then((module) => ({
+    default: module.RecoverableNoteEditor,
   })),
 );
 import { isRichNote } from "../domain/notes.ts";
@@ -1317,6 +1317,31 @@ function App() {
                   ＋ New
                 </button>
               </div>
+              {!!page.drafts?.length && (
+                <section aria-label="Recoverable drafts" className="notes-list">
+                  <h3>Recoverable drafts</h3>
+                  {page.drafts.map((draft: any) => (
+                    <button
+                      className="note-card"
+                      key={draft.id}
+                      onClick={() => {
+                        const current =
+                          page.artifacts.find(
+                            (a: any) => a.id === draft.artifactId,
+                          ) ?? null;
+                        setNote(current);
+                        setName(current?.title ?? "");
+                        setModal("edit-note");
+                      }}
+                    >
+                      <div>
+                        <strong>{draft.title || "Untitled draft"}</strong>
+                        <small>Unsaved · Recover draft</small>
+                      </div>
+                    </button>
+                  ))}
+                </section>
+              )}
               {!page.artifacts.length ? (
                 <div className="empty-notes">
                   <span>▱</span>
@@ -2383,7 +2408,10 @@ function App() {
         <NoteEditorDialog
           error={error}
           title={note ? "Edit note" : "New note"}
-          onClose={() => setModal(note ? "note" : "")}
+          onClose={() => {
+            setModal(note ? "note" : "");
+            void refresh().catch((e) => setError(e.message));
+          }}
         >
           {(onDraftState) => (
             <Suspense fallback={<p role="status">Opening editor…</p>}>
@@ -2394,39 +2422,49 @@ function App() {
                 availability={note?.referenceAvailability}
                 sources={page.sources}
                 notebookId={nbId}
+                artifactId={note?.id ?? null}
+                baseRevisionId={note?.revision_id ?? null}
                 onDraftState={onDraftState}
                 onReload={
                   note
-                    ? async () => {
+                    ? async (discard) => {
                         const updated = await api(`/notebooks/${nbId}`);
                         const current = updated.artifacts.find(
                           (a: any) => a.id === note.id,
                         );
                         if (!current) throw new Error("Note not found.");
+                        await discard();
                         setName(current.title);
                         setNote(current);
                         await refresh();
                       }
                     : undefined
                 }
-                onSave={async (title, document) => {
+                onSave={async (title, document, context) => {
                   const saved = await api(
                     `/notebooks/${nbId}/artifacts${note ? "/" + note.id : ""}`,
                     note ? "PATCH" : "POST",
                     {
                       title,
                       document,
-                      ...(note ? { baseRevisionId: note.revision_id } : {}),
+                      draft: context.draft,
+                      ...(note
+                        ? { baseRevisionId: context.baseRevisionId }
+                        : {}),
                     },
                   );
-                  const updated = await api(`/notebooks/${nbId}`);
-                  setNote(
-                    updated.artifacts.find(
-                      (a: any) => a.id === (note?.id ?? saved.id),
-                    ),
-                  );
-                  await refresh();
-                  setModal("note");
+                  // The save is committed. A failed refresh must not offer to
+                  // publish the same new note again or retain a cleared draft.
+                  setModal("");
+                  await act(async () => {
+                    const updated = await refresh();
+                    setNote(
+                      updated.artifacts.find(
+                        (a: any) => a.id === (note?.id ?? saved.id),
+                      ),
+                    );
+                    setModal("note");
+                  });
                 }}
               />
             </Suspense>
