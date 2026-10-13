@@ -27,6 +27,7 @@ import { RichNoteView, NoteHistory } from "./notes.tsx";
 import { AudioOverview } from "./audio-overview.tsx";
 import { Dialog } from "./dialog.tsx";
 import { NoteEditorDialog } from "./note-dialog.tsx";
+import { NoteTrash } from "./note-trash.tsx";
 const RichNoteEditor = lazy(() =>
   import("./recoverable-note-editor.tsx").then((module) => ({
     default: module.RecoverableNoteEditor,
@@ -298,6 +299,7 @@ function App() {
   const bottom = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const addSourcesControl = useRef<HTMLButtonElement>(null);
+  const trashControl = useRef<HTMLButtonElement>(null);
   const nbRef = useRef(nbId);
   nbRef.current = nbId;
   const refresh = async (id = nbRef.current) => {
@@ -1306,6 +1308,13 @@ function App() {
                   <span className="count">{page.artifacts.length}</span>
                 </h3>
                 <button
+                  ref={trashControl}
+                  className="small"
+                  onClick={() => setModal("note-trash")}
+                >
+                  Trash{page.trashCount ? ` (${page.trashCount})` : ""}
+                </button>
+                <button
                   className="small"
                   onClick={() => {
                     setNote(null);
@@ -2121,9 +2130,31 @@ function App() {
           />
         </Dialog>
       )}
+      {modal === "note-trash" && (
+        <NoteTrash
+          key={nbId}
+          notebookId={nbId}
+          onClose={() => setModal("")}
+          onChange={async () => {
+            const updated = await refresh();
+            if (
+              updated &&
+              !updated.conversations.some((c: any) => c.id === convId)
+            ) {
+              setConvId(updated.conversations[0]?.id ?? "");
+              setQuestion("");
+            }
+          }}
+        />
+      )}
       {(modal === "note" || (modal === "source" && viewer?.returnToNote)) &&
         note && (
-          <Dialog error={error} title={note.title} onClose={() => setModal("")}>
+          <Dialog
+            error={error}
+            title={note.title}
+            onClose={() => setModal("")}
+            closeDisabled={busy}
+          >
             {note.historical && (
               <p className="fine">
                 Historical revision · {new Date(note.created).toLocaleString()}{" "}
@@ -2244,6 +2275,37 @@ function App() {
                 />
               )}
             <div className="dialog-actions">
+              <button
+                type="button"
+                className="danger small"
+                disabled={busy || !!note.historical}
+                onClick={() =>
+                  void act(async () => {
+                    if (busy) return;
+                    setBusy(true);
+                    try {
+                      await api(
+                        `/notebooks/${nbId}/artifacts/${note.id}/trash`,
+                        "POST",
+                        {
+                          baseRevisionId: note.revision_id,
+                          trashVersion: note.trash_version,
+                        },
+                      );
+                      await refresh();
+                      setNote(null);
+                      setModal("");
+                      requestAnimationFrame(() =>
+                        trashControl.current?.focus(),
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })
+                }
+              >
+                Move to Trash
+              </button>
               <button
                 className="small"
                 disabled={!!note.historical}

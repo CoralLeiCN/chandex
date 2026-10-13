@@ -56,6 +56,36 @@ export class NotebookService {
         controller.abort();
     }
   }
+  private cancelNoteImports(n: string, a: string) {
+    for (const job of this.store.all(
+      "SELECT id FROM jobs WHERE notebook_id=? AND json_extract(input_metadata,'$.derivedFrom')=?",
+      n,
+      a,
+    ))
+      this.importControllers.get(job.id)?.abort();
+  }
+  trashArtifact(n: string, a: string, base: string, version: number) {
+    const note = this.store.trashArtifact(n, a, base, version);
+    this.cancelNoteImports(n, a);
+    return note;
+  }
+  deleteArtifact(n: string, a: string, version: number) {
+    if (
+      !this.store.one(
+        "SELECT id FROM deleted_notes WHERE notebook_id=? AND id=? AND trash_version=?",
+        n,
+        a,
+        version,
+      )
+    ) {
+      this.store.trashedArtifact(n, a, version);
+      // Capture controllers before pinned conversations and their runs disappear.
+      this.cancelNotebook(n);
+      this.dictation.cancelNotebook(n);
+      this.cancelNoteImports(n, a);
+    }
+    this.store.deleteArtifact(n, a, version);
+  }
   updateNotebook(
     n: string,
     data: {
@@ -119,7 +149,7 @@ export class NotebookService {
       throw new Error("The source is unavailable and cannot be refreshed.");
     if (descriptor.derivedFrom) {
       const revision = this.store.one(
-        "SELECT r.content FROM artifact_revisions r JOIN artifacts a ON a.id=r.artifact_id WHERE r.id=? AND a.id=? AND a.notebook_id=? AND a.unavailable=0",
+        "SELECT r.content FROM artifact_revisions r JOIN artifacts a ON a.id=r.artifact_id WHERE r.id=? AND a.id=? AND a.notebook_id=? AND a.unavailable=0 AND a.trashed_at IS NULL",
         descriptor.derivedRevision ?? null,
         descriptor.derivedFrom,
         n,

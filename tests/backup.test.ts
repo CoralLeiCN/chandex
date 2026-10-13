@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { schema17 } from "./fixtures/legacy-storage.ts";
 import { Store } from "../src/storage/store.ts";
 import { backup, restore } from "../src/storage/backup.ts";
 import { extract } from "../src/ingestion/extract.ts";
@@ -230,17 +231,19 @@ for (const legacy of [false, true])
           store.one("SELECT kind FROM revisions WHERE id=?", textRevision).kind,
           "text",
         );
-        if (legacy)
+        if (legacy) {
+          schema17(store);
           store.db.exec(
             "ALTER TABLE revisions DROP COLUMN kind; DROP TABLE note_drafts; DELETE FROM migrations WHERE version>=16;",
           );
+        }
         store.close();
         backup(data, path.join(root, "backup"));
         assert.equal(
           JSON.parse(
             readFileSync(path.join(root, "backup", "manifest.json"), "utf8"),
           ).schema,
-          legacy ? 15 : 17,
+          legacy ? 15 : 18,
         );
         restore(path.join(root, "backup"), restored);
         store = new Store(restored);
@@ -314,6 +317,7 @@ test("schema 3 backups restore and migrate without losing evidence or completed 
       ],
       coverageWarnings: [],
     });
+    schema17(store);
     store.db.exec(
       "DROP TABLE note_drafts; ALTER TABLE revisions DROP COLUMN kind; ALTER TABLE revisions DROP COLUMN provider_metadata; DROP TABLE note_conversations; DROP TABLE speech_assets; DROP TABLE speech_jobs; DROP TRIGGER note_search_insert; DROP TRIGGER note_search_update; DROP TRIGGER note_search_delete; DROP TABLE note_fts; DROP TABLE notebook_templates; ALTER TABLE notebooks DROP COLUMN tags; ALTER TABLE notebooks DROP COLUMN starter_questions; ALTER TABLE notebooks DROP COLUMN template_snapshot;",
     );
@@ -332,7 +336,7 @@ test("schema 3 backups restore and migrate without losing evidence or completed 
     store = new Store(path.join(root, "restored"));
     assert.equal(
       store.one("SELECT max(version) AS version FROM migrations").version,
-      17,
+      18,
     );
     assert.equal(
       store.one("SELECT status FROM runs WHERE id=?", r.id).status,

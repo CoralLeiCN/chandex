@@ -43,6 +43,7 @@ export class SpeechStore {
     return { artifactId: asset.artifact_id, revisionId: asset.revision_id };
   }
   script(n: string, a: string, revision: string) {
+    this.store.activeArtifact(n, a);
     const snapshot = this.store.artifactRevision(n, a, revision);
     const run = this.store.one(
       "SELECT * FROM runs WHERE id=? AND notebook_id=? AND status='completed' AND kind='audio-overview'",
