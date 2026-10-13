@@ -87,6 +87,27 @@ test("actual assembled PowerPoint is withheld if its evidence is purged before d
   }
 });
 
+test("moving a note to Trash withholds assembled PowerPoint until restoration", async () => {
+  const f = await fixture(),
+    gate = controlledAssembly(),
+    service = new SlideExportService(f.store, gate.assemble);
+  try {
+    const output = service.export(f.n, f.artifact.id, f.artifact.revision_id);
+    const refused = assert.rejects(output, /Trash/);
+    await gate.entered.promise;
+    f.store.trashArtifact(f.n, f.artifact.id, f.artifact.revision_id, 0);
+    gate.release.resolve();
+    await refused;
+    await assert.rejects(service.export(f.n, f.artifact.id), /Trash/);
+    f.store.restoreTrashedArtifact(f.n, f.artifact.id, 1);
+    assert.ok((await service.export(f.n, f.artifact.id)).length > 1000);
+  } finally {
+    gate.release.resolve();
+    await service.shutdown();
+    f.close();
+  }
+});
+
 test("two exports hold capacity through cancellation, reject excess without queueing and then release it", async () => {
   const f = await fixture(),
     gate = controlledAssembly(),

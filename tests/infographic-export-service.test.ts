@@ -87,6 +87,33 @@ test("actual image bytes are withheld when evidence is purged during export", as
     f.close();
   }
 });
+
+test("moving a note to Trash withholds assembled images until restoration", async () => {
+  const f = await fixture(),
+    gate = controlled(),
+    service = new InfographicExportService(f.store, gate.assemble);
+  try {
+    const output = service.export(f.n, f.artifact.id, undefined, "png");
+    const refused = assert.rejects(output, /Trash/);
+    await gate.entered.promise;
+    f.store.trashArtifact(f.n, f.artifact.id, f.artifact.revision_id, 0);
+    gate.release.resolve();
+    await refused;
+    await assert.rejects(
+      service.export(f.n, f.artifact.id, undefined, "svg"),
+      /Trash/,
+    );
+    f.store.restoreTrashedArtifact(f.n, f.artifact.id, 1);
+    assert.ok(
+      (await service.export(f.n, f.artifact.id, undefined, "png")).length >
+        1000,
+    );
+  } finally {
+    gate.release.resolve();
+    await service.shutdown();
+    f.close();
+  }
+});
 test("cancelled images keep capacity until settled and excess exports never queue", async () => {
   const f = await fixture(),
     gate = controlled(),

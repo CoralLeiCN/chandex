@@ -256,6 +256,24 @@ export class Store {
         ); CREATE INDEX note_drafts_notebook ON note_drafts(notebook_id,artifact_id,closed);
         INSERT INTO migrations VALUES(17);`);
       });
+    if (!this.one("SELECT version FROM migrations WHERE version=18"))
+      this.tx(() => {
+        this.db.exec(`
+          ALTER TABLE artifacts ADD COLUMN trashed_at TEXT;
+          ALTER TABLE artifacts ADD COLUMN trash_version INTEGER NOT NULL DEFAULT 0;
+          CREATE TABLE deleted_notes(id TEXT PRIMARY KEY,notebook_id TEXT NOT NULL REFERENCES notebooks(id) ON DELETE CASCADE,trash_version INTEGER NOT NULL);
+          DROP TRIGGER note_search_insert;
+          DROP TRIGGER note_search_update;
+          CREATE TRIGGER note_search_insert AFTER INSERT ON artifacts BEGIN
+            INSERT INTO note_fts(artifact_id,title,text) SELECT NEW.id,NEW.title,note_text(NEW.content) WHERE NEW.trashed_at IS NULL AND (NEW.unavailable=0 OR NEW.authored=1);
+          END;
+          CREATE TRIGGER note_search_update AFTER UPDATE OF title,content,authored,unavailable,trashed_at ON artifacts BEGIN
+            DELETE FROM note_fts WHERE artifact_id=OLD.id;
+            INSERT INTO note_fts(artifact_id,title,text) SELECT NEW.id,NEW.title,note_text(NEW.content) WHERE NEW.trashed_at IS NULL AND (NEW.unavailable=0 OR NEW.authored=1);
+          END;
+          INSERT INTO migrations VALUES(18);
+        `);
+      });
     this.drafts = new NoteDraftStore(this);
     this.speech = new SpeechStore(this);
     this.run(
@@ -511,14 +529,14 @@ export class Store {
           `SELECT 2,'passage',p.id,n.id,n.title,n.archived,p.title,snippet(passage_fts,1,'','','…',32),p.locator,p.revision_id FROM passage_fts JOIN passages p ON p.id=passage_fts.passage_id JOIN sources s ON s.id=p.source_id AND s.current_revision=p.revision_id JOIN notebooks n ON n.id=s.notebook_id WHERE ${filters} AND s.removed=0 AND passage_fts MATCH :fts`,
         );
         parts.push(
-          `SELECT 3,'note',a.id,n.id,n.title,n.archived,a.title,snippet(note_fts,2,'','','…',32),NULL,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) FROM note_fts JOIN artifacts a ON a.id=note_fts.artifact_id JOIN notebooks n ON n.id=a.notebook_id WHERE ${filters} AND (a.unavailable=0 OR a.authored=1) AND note_fts MATCH :fts`,
+          `SELECT 3,'note',a.id,n.id,n.title,n.archived,a.title,snippet(note_fts,2,'','','…',32),NULL,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) FROM note_fts JOIN artifacts a ON a.id=note_fts.artifact_id JOIN notebooks n ON n.id=a.notebook_id WHERE ${filters} AND a.trashed_at IS NULL AND (a.unavailable=0 OR a.authored=1) AND note_fts MATCH :fts`,
         );
       } else {
         parts.push(
           `SELECT 2,'passage',p.id,n.id,n.title,n.archived,p.title,substr(p.text,1,300),p.locator,p.revision_id FROM passages p JOIN sources s ON s.id=p.source_id AND s.current_revision=p.revision_id JOIN notebooks n ON n.id=s.notebook_id WHERE ${filters} AND s.removed=0 AND instr(unicode_fold(p.text),:q)>0`,
         );
         parts.push(
-          `SELECT 3,'note',a.id,n.id,n.title,n.archived,a.title,substr(note_fts.text,1,300),NULL,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) FROM note_fts JOIN artifacts a ON a.id=note_fts.artifact_id JOIN notebooks n ON n.id=a.notebook_id WHERE ${filters} AND (a.unavailable=0 OR a.authored=1) AND instr(unicode_fold(note_fts.title||' '||note_fts.text),:q)>0`,
+          `SELECT 3,'note',a.id,n.id,n.title,n.archived,a.title,substr(note_fts.text,1,300),NULL,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) FROM note_fts JOIN artifacts a ON a.id=note_fts.artifact_id JOIN notebooks n ON n.id=a.notebook_id WHERE ${filters} AND a.trashed_at IS NULL AND (a.unavailable=0 OR a.authored=1) AND instr(unicode_fold(note_fts.title||' '||note_fts.text),:q)>0`,
         );
       }
     }
@@ -587,6 +605,7 @@ export class Store {
     return note;
   }
   openNoteConversation(n: string, a: string, revision: string) {
+    this.activeArtifact(n, a);
     const note = this.sourceNoteRevision(n, a, revision);
     const existing = this.one(
       "SELECT conversation_id FROM note_conversations WHERE notebook_id=? AND note_revision=?",
@@ -927,7 +946,7 @@ export class Store {
     if (
       derivedFrom &&
       !this.one(
-        "SELECT id FROM artifacts WHERE id=? AND notebook_id=? AND unavailable=0",
+        "SELECT id FROM artifacts WHERE id=? AND notebook_id=? AND unavailable=0 AND trashed_at IS NULL",
         derivedFrom,
         n,
       )
@@ -1216,7 +1235,29 @@ export class Store {
       source.derived_from,
       n,
     );
-    if (!note) throw new Error("Originating note not found.");
+    if (!note) {
+      if (
+        !this.one(
+          "SELECT id FROM deleted_notes WHERE id=? AND notebook_id=?",
+          source.derived_from,
+          n,
+        )
+      )
+        throw new Error("Originating note not found.");
+      return {
+        artifactId: source.derived_from,
+        revisionId: null,
+        title: null,
+        origin: "unknown",
+        authored: null,
+        created: null,
+        runId: null,
+        manifest: [],
+        unavailable: true,
+        deleted: true,
+        content: null,
+      };
+    }
     const original =
       source.derived_revision &&
       this.one(
@@ -1457,7 +1498,7 @@ export class Store {
       this.notebook(n);
       const a = id();
       this.run(
-        "INSERT INTO artifacts VALUES(?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO artifacts(id,notebook_id,title,kind,content,authored,run_id,unavailable,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?)",
         a,
         n,
         title,
@@ -1488,6 +1529,7 @@ export class Store {
     text: string,
     base?: string,
   ) {
+    this.activeArtifact(n, a);
     if (
       !this.one("SELECT id FROM artifacts WHERE id=? AND notebook_id=?", a, n)
     )
@@ -1550,6 +1592,7 @@ export class Store {
     inherited: Citation[] = [],
   ) {
     return this.tx(() => {
+      this.activeArtifact(n, a);
       const current = this.one(
         "SELECT a.*,r.id AS revision FROM artifacts a JOIN artifact_revisions r ON r.artifact_id=a.id WHERE a.id=? AND a.notebook_id=? ORDER BY r.rowid DESC LIMIT 1",
         a,
@@ -1620,7 +1663,7 @@ export class Store {
   }
   artifactRevision(n: string, a: string, revision: string) {
     const row = this.one(
-      "SELECT a.id,a.kind,a.run_id,a.unavailable,a.title AS current_title,r.title,r.created,r.authored,r.id AS revision_id,r.content FROM artifact_revisions r JOIN artifacts a ON a.id=r.artifact_id WHERE a.id=? AND a.notebook_id=? AND r.id=?",
+      "SELECT a.id,a.kind,a.run_id,a.unavailable,a.trashed_at,a.trash_version,a.title AS current_title,r.title,r.created,r.authored,r.id AS revision_id,r.content FROM artifact_revisions r JOIN artifacts a ON a.id=r.artifact_id WHERE a.id=? AND a.notebook_id=? AND r.id=?",
       a,
       n,
       revision,
@@ -1643,6 +1686,7 @@ export class Store {
   }
   restoreArtifact(n: string, a: string, revision: string, base: string) {
     return this.tx(() => {
+      this.activeArtifact(n, a);
       const historical = this.artifactRevision(n, a, revision);
       if (!historical.available)
         throw new Error(
@@ -1685,6 +1729,7 @@ export class Store {
     });
   }
   quizRevision(n: string, a: string, revision: string): Answer {
+    this.activeArtifact(n, a);
     const row = this.one(
       "SELECT r.content,r.authored,a.unavailable,a.run_id FROM artifact_revisions r JOIN artifacts a ON a.id=r.artifact_id JOIN runs q ON q.id=a.run_id AND q.notebook_id=a.notebook_id WHERE r.id=? AND a.id=? AND a.notebook_id=? AND q.kind='quiz' AND q.status='completed' AND q.output=r.content",
       revision,
@@ -1809,11 +1854,135 @@ export class Store {
       };
     });
   }
+  activeArtifact(n: string, a: string) {
+    const note = this.one(
+      "SELECT * FROM artifacts WHERE notebook_id=? AND id=?",
+      n,
+      a,
+    );
+    if (!note) throw Error("Note not found.");
+    if (note.trashed_at)
+      throw Error("This note is in Trash. Restore it before using it.");
+    return note;
+  }
+  private trashVersion(version: number) {
+    if (!Number.isSafeInteger(version) || version < 0)
+      throw Error("Invalid Trash version.");
+  }
+  trashedArtifact(n: string, a: string, version: number) {
+    this.trashVersion(version);
+    const note = this.one(
+      "SELECT * FROM artifacts WHERE notebook_id=? AND id=?",
+      n,
+      a,
+    );
+    if (!note) throw Error("Note not found.");
+    if (!note.trashed_at || note.trash_version !== version)
+      throw Error(
+        "Trash changed. Reopen Trash before restoring or deleting this note.",
+      );
+    return note;
+  }
+  trash(n: string) {
+    this.notebook(n);
+    return this.all(
+      `SELECT a.id,a.title,a.kind,a.trashed_at,a.trash_version,
+      (SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) AS revision_id,
+      (SELECT count(*) FROM artifact_revisions WHERE artifact_id=a.id) AS revision_count,
+      (SELECT count(*) FROM note_drafts WHERE artifact_id=a.id AND closed=0) AS draft_count,
+      (SELECT count(*) FROM sources WHERE notebook_id=a.notebook_id AND derived_from=a.id) AS snapshot_count,
+      (SELECT count(*) FROM note_conversations nc JOIN artifact_revisions r ON r.id=nc.note_revision WHERE r.artifact_id=a.id) AS conversation_count
+      FROM artifacts a WHERE notebook_id=? AND trashed_at IS NOT NULL ORDER BY trashed_at DESC,a.id`,
+      n,
+    );
+  }
+  trashArtifact(n: string, a: string, base: string, version: number) {
+    this.trashVersion(version);
+    return this.tx(() => {
+      const note = this.activeArtifact(n, a);
+      if (
+        note.trash_version !== version ||
+        this.artifactHistory(n, a, 0, 1).results[0]?.id !== base
+      )
+        throw Error("Note changed. Reopen it before moving it to Trash.");
+      this.run(
+        "UPDATE artifacts SET trashed_at=?,trash_version=trash_version+1 WHERE id=?",
+        now(),
+        a,
+      );
+      // Prevent delayed promotion publication or duplicate acceptance after Trash.
+      this.run(
+        "UPDATE jobs SET status='failed',error='Originating note moved to Trash. Restore it before retrying.' WHERE notebook_id=? AND json_extract(input_metadata,'$.derivedFrom')=? AND status IN ('processing','duplicate')",
+        n,
+        a,
+      );
+      return this.trash(n).find((note) => note.id === a)!;
+    });
+  }
+  restoreTrashedArtifact(n: string, a: string, version: number) {
+    return this.tx(() => {
+      this.trashedArtifact(n, a, version);
+      this.run(
+        "UPDATE artifacts SET trashed_at=NULL,trash_version=trash_version+1 WHERE id=?",
+        a,
+      );
+      return { restored: true };
+    });
+  }
+  deleteArtifact(n: string, a: string, version: number) {
+    this.notebook(n);
+    this.trashVersion(version);
+    // Content-free receipts make retry after a lost response safe.
+    if (
+      this.one(
+        "SELECT id FROM deleted_notes WHERE notebook_id=? AND id=? AND trash_version=?",
+        n,
+        a,
+        version,
+      )
+    )
+      return;
+    this.trashedArtifact(n, a, version);
+    this.invalidate(n);
+    const snapshots = this.all(
+      "SELECT id FROM sources WHERE notebook_id=? AND derived_from=?",
+      n,
+      a,
+    );
+    for (const snapshot of snapshots) this.purgeSource(n, snapshot.id);
+    this.speech.invalidate(n, a);
+    this.speech.cleanup(n);
+    // Purge is restartable: retain the trashed note until filesystem cleanup succeeds.
+    this.tx(() => {
+      this.trashedArtifact(n, a, version);
+      this.run(
+        "DELETE FROM conversations WHERE id IN (SELECT nc.conversation_id FROM note_conversations nc JOIN artifact_revisions r ON r.id=nc.note_revision WHERE nc.notebook_id=? AND r.artifact_id=?)",
+        n,
+        a,
+      );
+      this.run(
+        "DELETE FROM jobs WHERE notebook_id=? AND json_extract(input_metadata,'$.derivedFrom')=?",
+        n,
+        a,
+      );
+      this.run(
+        "UPDATE revisions SET derived_revision=NULL WHERE derived_revision IN (SELECT id FROM artifact_revisions WHERE artifact_id=?)",
+        a,
+      );
+      this.run("INSERT INTO deleted_notes VALUES(?,?,?)", a, n, version);
+      this.run("DELETE FROM artifacts WHERE notebook_id=? AND id=?", n, a);
+    });
+    this.db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  }
   view(n: string) {
     const nb = this.notebook(n);
     return {
       ...nb,
       drafts: this.drafts.list(n),
+      trashCount: this.one(
+        "SELECT count(*) AS count FROM artifacts WHERE notebook_id=? AND trashed_at IS NOT NULL",
+        n,
+      ).count,
       sources: this.all(
         "SELECT s.*,r.warnings,r.hash,r.provider_metadata,CASE WHEN a.run_id IS NOT NULL THEN 'generated' WHEN a.authored=1 THEN 'user' ELSE 'unknown' END AS derived_origin FROM sources s LEFT JOIN revisions r ON r.id=s.current_revision LEFT JOIN artifacts a ON a.id=s.derived_from AND a.notebook_id=s.notebook_id WHERE s.notebook_id=? ORDER BY s.created",
         n,
@@ -1841,7 +2010,7 @@ export class Store {
         stats: parse(r.stats),
       })),
       artifacts: this.all(
-        "SELECT a.*,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) AS revision_id FROM artifacts a WHERE notebook_id=? ORDER BY updated DESC",
+        "SELECT a.*,(SELECT id FROM artifact_revisions WHERE artifact_id=a.id ORDER BY rowid DESC LIMIT 1) AS revision_id FROM artifacts a WHERE notebook_id=? AND trashed_at IS NULL ORDER BY updated DESC",
         n,
       ).map((a) => {
         const content = parse(a.content);
@@ -1863,7 +2032,7 @@ export class Store {
         };
       }),
       quizAttempts: this.all(
-        "SELECT * FROM quiz_attempts WHERE notebook_id=? ORDER BY created,rowid",
+        "SELECT q.* FROM quiz_attempts q JOIN artifacts a ON a.id=q.artifact_id WHERE q.notebook_id=? AND a.trashed_at IS NULL ORDER BY q.created,q.rowid",
         n,
       ).map((a) => ({ ...a, answers: parse(a.answers) })),
       jobs: this.all(

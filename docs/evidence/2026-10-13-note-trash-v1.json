@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-13",
+  "feature": "PN2 individual note Trash, restore and permanent deletion",
+  "storageSchema": 18,
+  "checks": {
+    "tests": 309,
+    "passed": 309,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 21511.8575,
+    "typecheck": "passed",
+    "productionBuild": "passed",
+    "diffCheck": "passed"
+  },
+  "storageAndApi": [
+    "Exact rich-note history and citations restored without a new revision",
+    "Hidden ordinary notes, drafts, quiz attempts and note FTS while trashed",
+    "Existing published snapshots and pinned conversations retained during Trash",
+    "Session/origin/notebook ownership and stale revision/lifecycle refusal",
+    "Explicit confirmation and content-free idempotent permanent-delete receipt",
+    "Recursive promotion purge and unavailable dependent generated evidence/authored references",
+    "Pinned conversations, note history and attached drafts deleted",
+    "Late generation/promotion and asynchronous PNG/PPTX output refused",
+    "Restart, schema 18 backup/restore and genuine schema 17/15/11/3 migrations",
+    "Real managed-blob permission failure leaves Trash/history for restart and retry"
+  ],
+  "browser": {
+    "fixture": "Temporary synthetic notebook; no user notes modified",
+    "origin": "http://127.0.0.1:41327",
+    "verified": [
+      "Desktop move/restore and current content",
+      "Two exact revision-history entries after restoration",
+      "Keyboard restoration and focus return",
+      "Permanent-deletion explanation and Keep in Trash default focus",
+      "390px mobile Notes & Studio entry point and dialog containment",
+      "Confirmation cancelled without deletion"
+    ],
+    "mobile": {
+      "viewportWidth": 390,
+      "pageWidth": 375,
+      "dialogWidth": 341
+    },
+    "permanentDeletion": "Verified by authenticated HTTP and component tests; final irreversible browser click was not used",
+    "modelRequests": 0
+  },
+  "limits": [
+    "Original chats/generation outputs, independent sources and existing backup/export copies remain",
+    "Named human semantic and broad assistive-technology/release gates remain unchanged"
+  ]
+}

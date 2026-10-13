@@ -790,6 +790,10 @@ const server = http.createServer(async (req, res) => {
         return;
       }
     }
+    if (p[3] === "trash" && p.length === 4 && method === "GET") {
+      json(res, 200, store.trash(n));
+      return;
+    }
     if (p[3] === "artifacts") {
       if (p.length === 4 && method === "POST") {
         const b = await body(req);
@@ -834,12 +838,43 @@ const server = http.createServer(async (req, res) => {
         });
         return;
       }
+      if (p.length === 5 && method === "DELETE") {
+        const b = await body(req, 1024);
+        if (b.confirm !== true)
+          throw Error("Confirm permanent deletion and its effects.");
+        service.deleteArtifact(n, p[4], b.trashVersion);
+        json(res, 200, { deleted: true });
+        return;
+      }
       const a = store.one(
         "SELECT * FROM artifacts WHERE id=? AND notebook_id=?",
         p[4],
         n,
       );
       if (!a) throw new Error("Note not found.");
+      if (p[5] === "trash" && method === "POST") {
+        const b = await body(req, 1024);
+        if (p.length === 6) {
+          json(
+            res,
+            200,
+            service.trashArtifact(
+              n,
+              a.id,
+              string(b.baseRevisionId, 100),
+              b.trashVersion,
+            ),
+          );
+          return;
+        }
+        if (p.length === 7 && p[6] === "restore") {
+          json(res, 200, store.restoreTrashedArtifact(n, a.id, b.trashVersion));
+          return;
+        }
+      }
+      // Trash history is readable, while publication and exports require restoration.
+      if (!(p[5] === "revisions" && method === "GET"))
+        store.activeArtifact(n, a.id);
       if (p[5] === "audio") {
         if (!audioOverviewsEnabled)
           throw new Error(

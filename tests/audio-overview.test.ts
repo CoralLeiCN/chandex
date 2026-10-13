@@ -435,7 +435,7 @@ test("schema 13 backups restore exact speech and reject missing or tampered medi
     const manifestFile = join(saved, "manifest.json"),
       manifest = JSON.parse(readFileSync(manifestFile, "utf8")),
       originalManifest = JSON.stringify(manifest);
-    assert.equal(manifest.schema, 17);
+    assert.equal(manifest.schema, 18);
     assert.equal(manifest.hashes["blobs/" + asset.blob], asset.hash);
     delete manifest.hashes["blobs/" + asset.blob];
     writeFileSync(manifestFile, JSON.stringify(manifest));

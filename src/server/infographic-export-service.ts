@@ -47,6 +47,7 @@ export class InfographicExportService {
     format: InfographicFormat,
     signal?: AbortSignal,
   ) {
+    this.store.activeArtifact(n, id);
     const current = this.store.artifactHistory(n, id, 0, 1).results[0];
     if (!current) throw Error("Saved note revision not found.");
     const snapshot = this.store.artifactRevision(
@@ -81,6 +82,7 @@ export class InfographicExportService {
       throw Error("Infographic export was cancelled.");
     if (!this.store.artifactRevision(n, id, snapshot.revision_id).available)
       throw Error("Infographic evidence became unavailable during export.");
+    this.store.activeArtifact(n, id);
     return bytes;
   }
   async shutdown() {

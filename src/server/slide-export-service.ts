@@ -44,6 +44,7 @@ export class SlideExportService {
     revisionId?: string,
     signal?: AbortSignal,
   ): Promise<Buffer> {
+    this.store.activeArtifact(notebookId, artifactId);
     const current = this.store.artifactHistory(notebookId, artifactId, 0, 1)
       .results[0];
     if (!current) throw Error("Saved note revision not found.");
@@ -86,6 +87,7 @@ export class SlideExportService {
     );
     if (!after.available)
       throw Error("Slide evidence became unavailable during export.");
+    this.store.activeArtifact(notebookId, artifactId);
     return bytes;
   }
 

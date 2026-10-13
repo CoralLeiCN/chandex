@@ -23,7 +23,7 @@ export class NoteDraftStore {
   list(n: string, artifactId?: string | null): NoteDraftSummary[] {
     this.store.notebook(n);
     return this.store.all(
-      "SELECT id,version,artifact_id AS artifactId,base_revision_id AS baseRevisionId,title,updated FROM note_drafts WHERE notebook_id=? AND closed=0" +
+      "SELECT id,version,artifact_id AS artifactId,base_revision_id AS baseRevisionId,title,updated FROM note_drafts WHERE notebook_id=? AND closed=0 AND (artifact_id IS NULL OR artifact_id IN (SELECT id FROM artifacts WHERE trashed_at IS NULL))" +
         (artifactId === undefined ? "" : " AND artifact_id IS ?") +
         " ORDER BY updated DESC,id",
       n,
@@ -37,6 +37,7 @@ export class NoteDraftStore {
       id,
     );
     if (!row) throw Error("Draft not found.");
+    if (row.artifact_id) this.store.activeArtifact(n, row.artifact_id);
     const document = JSON.parse(row.document);
     return {
       id: row.id,
@@ -88,6 +89,7 @@ export class NoteDraftStore {
         : noteCitations(
             this.store.artifactRevision(n, artifactId, base).content,
           );
+    if (artifactId !== null) this.store.activeArtifact(n, artifactId);
     return this.store.tx(() => {
       const row = this.store.one("SELECT * FROM note_drafts WHERE id=?", id);
       if (
