@@ -497,6 +497,22 @@ select:focus {
 .studio-panel {
   background: #fcfcf7;
 }
+.studio-tools {
+  margin: 24px 0 18px;
+  border-top: 1px solid #e4e8dc;
+}
+.studio-tools > summary {
+  padding: 18px 19px;
+  cursor: pointer;
+  color: #3f553a;
+  font-size: 12px;
+}
+.note-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
 .studio-intro {
   padding: 21px 19px 17px;
 }
@@ -572,9 +588,7 @@ select:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 30px 19px 12px;
-  padding-top: 18px;
-  border-top: 1px solid #e4e8dc;
+  margin: 20px 19px 12px;
   gap: 8px;
 }
 .trash-list {

@@ -1,5 +1,7 @@
 # Codeboom implementation plan
 
+Note reliability and layout refinement (2026-10-23): safe retries for unconfirmed note saves, displayed-revision checks for promotion, late-response protection for notebook/conversation loading and personal notes above collapsed Studio controls are implemented. Schema 19 retains save receipts through restart and backup. See [verification](verification.md#note-reliability-and-notes-first-layout-2026-10-23).
+
 Latest scope clarification (2026-10-10): **video output and provider publishing integrations are user-deferred**, alongside cloud/team, generated audio and YouTube. Explicit web research remains in current scope and now has a local query-only discovery/snapshot prototype. Retain older checkpoints as history without treating their deferred work as current obligations.
 
 Local infographic increment (2026-10-10): typed cited templates, saved-revision viewer and bounded PNG/SVG exports are implemented with [265-test/lifecycle/native/browser evidence](../evals/results/2026-10-10-infographic-integration-v8.json). Human semantic, representative rendering/load and model reliability gates remain open. Main and manual preview origins are fixed at port 40732/44281 at the user's request. Cloud/team work stays deferred; broader local work remains active.

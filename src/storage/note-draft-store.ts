@@ -1,5 +1,6 @@
 import type { Store } from "./store.ts";
 import { noteCitations, richNote } from "../domain/notes.ts";
+import { digest } from "../domain/evidence.ts";
 import type {
   DraftReference,
   NoteDraft,
@@ -8,6 +9,44 @@ import type {
 
 export class NoteDraftStore {
   constructor(private store: Store) {}
+
+  saveOnce(
+    n: string,
+    key: unknown,
+    request: unknown,
+    save: () => string,
+  ): string {
+    // Older API clients may omit an operation ID.
+    if (key === undefined) return save();
+    if (typeof key !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(key))
+      throw Error("Invalid note save ID.");
+    const hash = digest(JSON.stringify(request));
+    return this.store.tx(() => {
+      this.store.notebook(n);
+      const previous = this.store.one(
+        "SELECT * FROM note_saves WHERE id=?",
+        key,
+      );
+      if (previous) {
+        if (previous.notebook_id !== n || previous.request_hash !== hash)
+          throw Error("Save ID belongs to another note save.");
+        if (!previous.artifact_id)
+          throw Error("The saved note was permanently deleted.");
+        this.store.activeArtifact(n, previous.artifact_id);
+        return previous.artifact_id;
+      }
+      const artifact = save();
+      this.store.activeArtifact(n, artifact);
+      this.store.run(
+        "INSERT INTO note_saves(id,notebook_id,request_hash,artifact_id) VALUES(?,?,?,?)",
+        key,
+        n,
+        hash,
+        artifact,
+      );
+      return artifact;
+    });
+  }
 
   private reference(value: any): DraftReference {
     if (

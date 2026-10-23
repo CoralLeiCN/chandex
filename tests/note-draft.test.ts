@@ -11,13 +11,18 @@ import os from "node:os";
 import { editableNote, richNote } from "../src/domain/notes.ts";
 import { richFixture } from "./fixtures/notes.ts";
 import { voiceEnvironment } from "./fixtures/voice-capture.ts";
+import { api, ApiError } from "../src/web/api.ts";
 
 async function fixture(
   options: {
     save?: (
       title: string,
       document: RichNote,
-      context?: { baseRevisionId: string | null; draft?: DraftReference },
+      context?: {
+        baseRevisionId: string | null;
+        draft?: DraftReference;
+        saveId: string;
+      },
     ) => Promise<void>;
     module?: () => Promise<void>;
     text?: string;
@@ -125,6 +130,7 @@ async function fixture(
                   context?: {
                     baseRevisionId: string | null;
                     draft?: DraftReference;
+                    saveId: string;
                   },
                 ) => {
                   saves++;
@@ -303,6 +309,98 @@ function draftApi(
   };
 }
 
+test("lost publication replies retry the identical create or edit without new drafts, notes or revisions", async () => {
+  for (const editing of [false, true]) {
+    const root = mkdtempSync(os.tmpdir() + "/codeboom-save-reply-");
+    const store = new Store(root),
+      n = store.createNotebook("Personal").id;
+    const artifactId = editing
+      ? store.createRichArtifact(
+          n,
+          "Existing",
+          editableNote({ text: "Before" }),
+        )
+      : null;
+    const original = artifactId ? store.view(n).artifacts[0] : null;
+    const drafts = draftApi(store),
+      requests: any[] = [];
+    let lose = true,
+      ui: Awaited<ReturnType<typeof fixture>> | undefined;
+    try {
+      ui = await fixture({
+        recovery: true,
+        notebookId: n,
+        artifactId: artifactId ?? undefined,
+        baseRevisionId: original?.revision_id,
+        fetch: async (url, init) => {
+          if (init?.method !== "POST" && init?.method !== "PATCH")
+            return drafts(url, init);
+          const b = JSON.parse(String(init.body));
+          requests.push(b);
+          const id = store.drafts.saveOnce(
+            n,
+            b.saveId,
+            { ...b, artifactId },
+            () =>
+              store.drafts.publish(
+                n,
+                b.draft,
+                artifactId,
+                original?.revision_id ?? null,
+                () => {
+                  if (artifactId) {
+                    store.editRichArtifact(
+                      n,
+                      artifactId,
+                      b.title,
+                      b.document,
+                      b.baseRevisionId,
+                    );
+                    return artifactId;
+                  }
+                  return store.createRichArtifact(n, b.title, b.document);
+                },
+              ),
+          );
+          if (lose) {
+            lose = false;
+            throw new TypeError("Response lost");
+          }
+          return new Response(JSON.stringify({ id }));
+        },
+        save: async (title, document, context) => {
+          await api(
+            `/notebooks/${n}/artifacts${artifactId ? "/" + artifactId : ""}`,
+            artifactId ? "PATCH" : "POST",
+            { title, document, ...context },
+          );
+        },
+      });
+      await ui.title("Save just once");
+      await ui.click("Save note");
+      assert.match(ui.container.textContent!, /save could not be confirmed/);
+      assert.equal(ui.editor.isEditable, false);
+      assert.equal(
+        ui.container.querySelector("input")!.matches(":disabled"),
+        true,
+      );
+      assert.equal(store.view(n).artifacts.length, 1);
+      assert.equal(store.drafts.list(n).length, 0);
+      const revision = store.view(n).artifacts[0].revision_id;
+      await ui.click("Retry save");
+      assert.deepEqual(requests[1], requests[0]);
+      assert.equal(store.view(n).artifacts.length, 1);
+      assert.equal(store.view(n).artifacts[0].revision_id, revision);
+      assert.equal(store.drafts.list(n).length, 0);
+      assert.match(ui.container.textContent!, /Editor closed/);
+    } finally {
+      await ui?.close();
+      store.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("automatic drafts recover rich content after editor restart, then explicit Save publishes and clears recovery", async () => {
   const root = mkdtempSync(os.tmpdir() + "/codeboom-draft-ui-");
   const store = new Store(root),
@@ -433,14 +531,24 @@ test("recovered drafts retain their original base and survive failed or stale Sa
     fetch: draftApi(store),
     save: async (title, doc, context) => {
       if (++saves === 1) throw Error("Temporary publication failure");
-      store.drafts.publish(
-        n,
-        context!.draft,
-        note,
-        context!.baseRevisionId,
-        () =>
-          store.editRichArtifact(n, note, title, doc, context!.baseRevisionId!),
-      );
+      try {
+        store.drafts.publish(
+          n,
+          context!.draft,
+          note,
+          context!.baseRevisionId,
+          () =>
+            store.editRichArtifact(
+              n,
+              note,
+              title,
+              doc,
+              context!.baseRevisionId!,
+            ),
+        );
+      } catch (e) {
+        throw new ApiError((e as Error).message, 400);
+      }
     },
   });
   try {
@@ -450,8 +558,9 @@ test("recovered drafts retain their original base and survive failed or stale Sa
     await ui.click("Save note");
     assert.match(ui.container.textContent!, /Temporary publication failure/);
     assert.equal(store.view(n).drafts.length, 1);
-    await ui.click("Save note");
+    await ui.click("Retry save");
     assert.match(ui.container.textContent!, /Note changed/);
+    assert.equal(ui.editor.isEditable, true);
     assert.equal(ui.editor.getText(), "My unfinished changes");
     assert.equal(store.view(n).artifacts[0].revision_id, current.revision_id);
     assert.equal(store.drafts.read(n, "recover-me").baseRevisionId, base);

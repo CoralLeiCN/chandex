@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-23",
+  "scope": "Safe note-save retries, revision-checked promotion, notebook loading races and notes-first layout",
+  "schema": 19,
+  "checks": {
+    "tests": { "passed": 314, "failed": 0, "skipped": 0, "durationMs": 28278.103709, "command": "npm test" },
+    "typecheck": { "passed": true, "command": "npm run typecheck" },
+    "build": { "passed": true, "command": "npm run build", "existingDiagnostic": "Tiptap use client module directive" },
+    "whitespace": { "passed": true, "command": "git diff --check" }
+  },
+  "regressions": [
+    "Committed create/edit with a lost publication response retries the identical request without another note, revision or draft",
+    "Save receipt migration from schema 18, restart, backup/restore, rollback, notebook scope, altered request refusal and deletion lifecycle",
+    "Authenticated HTTP create/edit replay bypasses closed-draft and stale-base checks only for the original operation",
+    "Stale, missing and foreign promotion revisions create no import job; accepted promotion remains pinned during later edits",
+    "Late notebook responses and conversation IDs, returning to the same notebook, overlapping refreshes and valid conversation preservation"
+  ],
+  "browser": {
+    "origin": "http://127.0.0.1:44281",
+    "data": "Disposable synthetic notebook directory",
+    "desktop": "Saved notes, recovery and New note precede collapsed Studio; disclosure expands and collapses; new title/body saves and reopens; clean reload retains note",
+    "mobile": { "viewport": { "width": 390, "height": 844 }, "pageScrollWidth": 375, "horizontalOverflow": false, "notesAboveCollapsedStudio": true },
+    "warnings": 0,
+    "errors": 0,
+    "screenshots": ["notes-desktop.jpg", "notes-mobile.jpg"],
+    "screenshotLocation": "Task visualization workspace",
+    "temporaryResourcesCleanedUp": true,
+    "personalNotesUsed": false,
+    "modelGenerations": 0
+  },
+  "limitations": ["Existing named human semantic and broader assistive-technology release gates remain open"]
+}

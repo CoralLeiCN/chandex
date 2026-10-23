@@ -11,6 +11,14 @@ export async function api(
     ...options,
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error ?? "Request failed.");
+  if (!r.ok) throw new ApiError(data.error ?? "Request failed.", r.status);
   return data;
+}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }

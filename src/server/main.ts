@@ -820,13 +820,19 @@ const server = http.createServer(async (req, res) => {
         json(res, 201, {
           id:
             b.document !== undefined
-              ? store.drafts.publish(n, b.draft, null, null, (draft) =>
-                  store.createRichArtifact(
-                    n,
-                    title(b.title),
-                    b.document,
-                    noteCitations(draft?.document ?? {}),
-                  ),
+              ? store.drafts.saveOnce(
+                  n,
+                  b.saveId,
+                  { ...b, artifactId: null },
+                  () =>
+                    store.drafts.publish(n, b.draft, null, null, (draft) =>
+                      store.createRichArtifact(
+                        n,
+                        title(b.title),
+                        b.document,
+                        noteCitations(draft?.document ?? {}),
+                      ),
+                    ),
                 )
               : store.saveArtifact(
                   n,
@@ -1036,21 +1042,24 @@ const server = http.createServer(async (req, res) => {
       if (p.length === 5 && method === "PATCH") {
         const b = await body(req);
         if (b.document !== undefined)
-          store.drafts.publish(
-            n,
-            b.draft,
-            a.id,
-            string(b.baseRevisionId, 100),
-            (draft) =>
-              store.editRichArtifact(
-                n,
-                a.id,
-                title(b.title),
-                b.document,
-                string(b.baseRevisionId, 100),
-                noteCitations(draft?.document ?? {}),
-              ),
-          );
+          store.drafts.saveOnce(n, b.saveId, { ...b, artifactId: a.id }, () => {
+            store.drafts.publish(
+              n,
+              b.draft,
+              a.id,
+              string(b.baseRevisionId, 100),
+              (draft) =>
+                store.editRichArtifact(
+                  n,
+                  a.id,
+                  title(b.title),
+                  b.document,
+                  string(b.baseRevisionId, 100),
+                  noteCitations(draft?.document ?? {}),
+                ),
+            );
+            return a.id;
+          });
         else
           store.editArtifact(
             n,
@@ -1171,11 +1180,18 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (p[5] === "promote" && method === "POST") {
-        if (a.unavailable)
+        const b = await body(req),
+          note = store.activeArtifact(n, a.id),
+          revision = store.artifactHistory(n, a.id, 0, 1).results[0];
+        if (string(b.revisionId, 100) !== revision?.id)
+          throw new Error(
+            "Note changed. Reopen it before using it as a source.",
+          );
+        if (note.unavailable)
           throw new Error(
             "This note has unavailable evidence and cannot be promoted.",
           );
-        const content = JSON.parse(a.content);
+        const content = JSON.parse(note.content);
         if (
           isRichNote(content) &&
           noteCitations(content).some((c) => {
@@ -1191,18 +1207,14 @@ const server = http.createServer(async (req, res) => {
             "This note has unavailable references and cannot be promoted.",
           );
         const text = documentText(content);
-        const revision = store.one(
-          "SELECT id FROM artifact_revisions WHERE artifact_id=? ORDER BY rowid DESC LIMIT 1",
-          a.id,
-        );
         const descriptor = {
           kind: "note",
           derivedFrom: a.id,
           derivedRevision: revision.id,
         };
-        const job = store.beginImport(n, a.title, randomUUID(), descriptor);
+        const job = store.beginImport(n, note.title, randomUUID(), descriptor);
         void service.import(n, job.id, {
-          title: a.title,
+          title: note.title,
           ...descriptor,
           bytes: Buffer.from(text),
         });

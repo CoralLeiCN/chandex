@@ -117,13 +117,32 @@ test("draft HTTP lifecycle enforces session, origin, scope, size, stale Save and
       400,
     );
     assert.equal((await request(`${n}/drafts/d1`)).status, 200);
-    const save = await request(`${n}/artifacts`, "POST", {
+    const publication = {
       title: "Saved",
       document: draft.document,
       draft: { id: "d1", version: 1 },
-    });
+      saveId: "create-once",
+    };
+    const save = await request(`${n}/artifacts`, "POST", publication);
     assert.equal(save.status, 201);
     const { id } = await save.json();
+    const replay = await request(`${n}/artifacts`, "POST", publication);
+    assert.equal(replay.status, 201);
+    assert.deepEqual(await replay.json(), { id });
+    assert.equal((await (await request(n)).json()).artifacts.length, 1);
+    assert.equal(
+      (
+        await request(`${n}/artifacts`, "POST", {
+          ...publication,
+          title: "Different request",
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (await request(`${other}/artifacts`, "POST", publication)).status,
+      400,
+    );
     assert.equal((await request(`${n}/drafts/d1`)).status, 400);
     assert.equal(
       (await request(`${n}/drafts/d1`, "PUT", { ...draft, version: 2 })).status,
@@ -162,6 +181,21 @@ test("draft HTTP lifecycle enforces session, origin, scope, size, stale Save and
     assert.equal((await request(`${n}/drafts/edit`)).status, 200);
     const latest = (await (await request(n)).json()).artifacts[0];
     assert.equal(latest.title, "Other window");
+    const beforePromotion = (await (await request(n)).json()).jobs.length;
+    for (const revisionId of [
+      undefined,
+      current.revision_id,
+      "foreign-revision",
+    ]) {
+      const promotion = await request(`${n}/artifacts/${id}/promote`, "POST", {
+        revisionId,
+      });
+      assert.equal(promotion.status, 400);
+    }
+    assert.equal(
+      (await (await request(n)).json()).jobs.length,
+      beforePromotion,
+    );
     assert.equal(
       (
         await request(`${n}/drafts/current`, "PUT", {
@@ -171,16 +205,25 @@ test("draft HTTP lifecycle enforces session, origin, scope, size, stale Save and
       ).status,
       200,
     );
+    const finalPublication = {
+      title: "Final",
+      document: edit.document,
+      baseRevisionId: latest.revision_id,
+      draft: { id: "current", version: 1 },
+      saveId: "edit-once",
+    };
     assert.equal(
-      (
-        await request(`${n}/artifacts/${id}`, "PATCH", {
-          title: "Final",
-          document: edit.document,
-          baseRevisionId: latest.revision_id,
-          draft: { id: "current", version: 1 },
-        })
-      ).status,
+      (await request(`${n}/artifacts/${id}`, "PATCH", finalPublication)).status,
       200,
+    );
+    const final = (await (await request(n)).json()).artifacts[0];
+    assert.equal(
+      (await request(`${n}/artifacts/${id}`, "PATCH", finalPublication)).status,
+      200,
+    );
+    assert.equal(
+      (await (await request(n)).json()).artifacts[0].revision_id,
+      final.revision_id,
     );
     assert.equal((await request(`${n}/drafts/current`)).status, 400);
     assert.equal(

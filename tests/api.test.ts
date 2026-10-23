@@ -660,7 +660,14 @@ CodexClient.prototype.run = async function () {
       ).status,
       400,
     );
-    const richPromotion = (await call(richRoute + "/promote", "POST", {})).data;
+    const richPromotion = (
+      await call(richRoute + "/promote", "POST", {
+        revisionId: (
+          await call(`/notebooks/${seedNotebook}`)
+        ).data.artifacts.find((a: any) => a.id === createdRich.data.id)
+          .revision_id,
+      })
+    ).data;
     let richPromotionView: any;
     for (let i = 0; i < 80; i++) {
       richPromotionView = (await call(`/notebooks/${seedNotebook}`)).data;
@@ -876,7 +883,7 @@ CodexClient.prototype.run = async function () {
           await call(
             `/notebooks/${seedNotebook}/artifacts/${fixture.artifact.id}/promote`,
             "POST",
-            {},
+            { revisionId: fixture.artifact.revision_id },
           )
         ).status,
         202,
@@ -917,7 +924,7 @@ CodexClient.prototype.run = async function () {
     const quizPromotion = await call(
       `/notebooks/${seedNotebook}/artifacts/${quizArtifact.id}/promote`,
       "POST",
-      {},
+      { revisionId: quizArtifact.revision_id },
     );
     assert.equal(quizPromotion.status, 202);
     let promotedQuiz: any;
@@ -1372,7 +1379,11 @@ CodexClient.prototype.run = async function () {
       await call(
         "/notebooks/" + n + "/artifacts/" + note + "/promote",
         "POST",
-        {},
+        {
+          revisionId: (await call("/notebooks/" + n)).data.artifacts.find(
+            (a: any) => a.id === note,
+          ).revision_id,
+        },
       )
     ).data;
     await call("/notebooks/" + n + "/artifacts/" + note, "PATCH", {
@@ -1514,7 +1525,14 @@ CodexClient.prototype.run = async function () {
     ).data.artifacts.find((a: any) => a.id === createdRich.data.id);
     assert.equal(purgedRich.referenceAvailability[richPassage.id], false);
     assert.equal(purgedRich.referencesUnavailable, true);
-    assert.equal((await call(richRoute + "/promote", "POST", {})).status, 400);
+    assert.equal(
+      (
+        await call(richRoute + "/promote", "POST", {
+          revisionId: purgedRich.revision_id,
+        })
+      ).status,
+      400,
+    );
     const retainedExport = await fetch(`${base}/api${richRoute}/export`, {
       headers: { Cookie: cookie },
     });

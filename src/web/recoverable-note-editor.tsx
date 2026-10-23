@@ -2,9 +2,10 @@ import React, {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
 } from "react";
-import { api } from "./api.ts";
+import { api, ApiError } from "./api.ts";
 import { RichNoteEditor } from "./note-editor.tsx";
 import { NoteDraftWriter, type DraftStatus } from "./note-draft-writer.ts";
 import type {
@@ -17,14 +18,18 @@ import type { NoteDraftState } from "./note-dialog.tsx";
 
 type Props = Omit<
   React.ComponentProps<typeof RichNoteEditor>,
-  "onSave" | "onReload" | "onChange" | "recovered" | "blocked"
+  "onSave" | "onReload" | "onChange" | "recovered" | "blocked" | "retrySave"
 > & {
   artifactId: string | null;
   baseRevisionId: string | null;
   onSave: (
     title: string,
     document: RichNote,
-    context: { baseRevisionId: string | null; draft?: DraftReference },
+    context: {
+      baseRevisionId: string | null;
+      draft?: DraftReference;
+      saveId: string;
+    },
   ) => Promise<void>;
   onReload?: (discard: () => Promise<void>) => Promise<void>;
 };
@@ -151,7 +156,17 @@ function DraftSession({
   const [status, setStatus] = useState<DraftStatus>({
       state: recoveredDraft ? "saved" : "clean",
     }),
-    [blocked, setBlocked] = useState(false);
+    [blocked, setBlocked] = useState(false),
+    [retrySave, setRetrySave] = useState(false);
+  const publication = useRef<{
+    title: string;
+    document: RichNote;
+    context: {
+      baseRevisionId: string | null;
+      draft?: DraftReference;
+      saveId: string;
+    };
+  } | null>(null);
   const [writer] = useState(
     () =>
       new NoteDraftWriter(
@@ -218,6 +233,13 @@ function DraftSession({
           revision to discard this draft and start again.
         </p>
       )}
+      {retrySave && (
+        <p role="alert" className="note-discard">
+          The save could not be confirmed. Choose Retry save to check the same
+          save before continuing to edit. Discarding this draft does not remove
+          a note that was already saved.
+        </p>
+      )}
       <RichNoteEditor
         {...props}
         initial={recoveredDraft?.document ?? props.initial}
@@ -227,6 +249,7 @@ function DraftSession({
         }
         recovered={!!recoveredDraft}
         blocked={blocked}
+        retrySave={retrySave}
         onChange={(title, document, changed) =>
           writer.change(
             { artifactId: props.artifactId, baseRevisionId, title, document },
@@ -236,14 +259,38 @@ function DraftSession({
         onDraftState={report}
         onReload={props.onReload ? () => props.onReload!(discard) : undefined}
         onSave={async (title, document) => {
-          writer.change(
-            { artifactId: props.artifactId, baseRevisionId, title, document },
-            true,
-            true,
-          );
-          const draft = await writer.flush();
-          await props.onSave(title, document, { baseRevisionId, draft });
-          writer.published();
+          if (!publication.current) {
+            writer.change(
+              { artifactId: props.artifactId, baseRevisionId, title, document },
+              true,
+              true,
+            );
+            const draft = await writer.flush();
+            publication.current = {
+              title,
+              document,
+              context: { baseRevisionId, draft, saveId: crypto.randomUUID() },
+            };
+          }
+          const pending = publication.current;
+          try {
+            await props.onSave(
+              pending.title,
+              pending.document,
+              pending.context,
+            );
+            writer.published();
+            publication.current = null;
+            setRetrySave(false);
+          } catch (e) {
+            if (e instanceof ApiError && e.status === 400) {
+              publication.current = null;
+              setRetrySave(false);
+            } else {
+              setRetrySave(true);
+            }
+            throw e;
+          }
         }}
       />
     </>
