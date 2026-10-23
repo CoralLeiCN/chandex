@@ -119,6 +119,7 @@ export function RichNoteEditor({
   onChange,
   recovered = false,
   blocked = false,
+  retrySave = false,
   availability = {},
 }: {
   initial: any;
@@ -131,6 +132,7 @@ export function RichNoteEditor({
   onChange?: (title: string, document: RichNote, changed: boolean) => void;
   recovered?: boolean;
   blocked?: boolean;
+  retrySave?: boolean;
   availability?: Record<string, boolean>;
 }) {
   const [title, setTitle] = useState(initialTitle),
@@ -232,7 +234,7 @@ export function RichNoteEditor({
   }, [editor]);
   const changed = recovered || title !== initialTitle || documentChanged;
   useEffect(() => {
-    if (editor && !start.error && !saving && !blocked)
+    if (editor && !start.error && !saving && !blocked && !retrySave)
       onChange?.(
         title,
         {
@@ -259,8 +261,8 @@ export function RichNoteEditor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [changed, saving]);
   useEffect(() => {
-    editor?.setEditable(!saving && !blocked);
-  }, [editor, saving, blocked]);
+    editor?.setEditable(!saving && !blocked && !retrySave);
+  }, [editor, saving, blocked, retrySave]);
   useEffect(() => {
     if (editor && recovered) editor.commands.focus("end");
   }, [editor, recovered]);
@@ -363,261 +365,270 @@ export function RichNoteEditor({
           Reload saved revision (discard this draft)
         </button>
       )}
-      <label>
-        Title
-        <input
-          value={title}
-          disabled={saving || blocked}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={200}
-          required
-        />
-      </label>
-      <div
-        className="rich-note-toolbar"
-        role="group"
-        aria-label="Note formatting"
+      <fieldset
+        className="note-fields"
+        disabled={saving || blocked || retrySave}
       >
-        {button(
-          "Bold",
-          () => {
-            editor.chain().focus().toggleBold().run();
-          },
-          editor.isActive("bold"),
-        )}
-        {button(
-          "Italic",
-          () => {
-            editor.chain().focus().toggleItalic().run();
-          },
-          editor.isActive("italic"),
-        )}
-        {button(
-          "Underline",
-          () => {
-            editor.chain().focus().toggleUnderline().run();
-          },
-          editor.isActive("underline"),
-        )}
-        {button(
-          "Strikethrough",
-          () => {
-            editor.chain().focus().toggleStrike().run();
-          },
-          editor.isActive("strike"),
-        )}
-        {button(
-          "Inline code",
-          () => {
-            editor.chain().focus().toggleCode().run();
-          },
-          editor.isActive("code"),
-        )}
-        <label className="note-block-type">
-          Block style
-          <select
-            aria-label="Block style"
-            value={
-              editor.isActive("heading")
-                ? String(editor.getAttributes("heading").level)
-                : "paragraph"
-            }
-            onChange={(e) => {
-              const level = Number(e.target.value) as 1 | 2 | 3;
-              if (level) editor.chain().focus().setHeading({ level }).run();
-              else editor.chain().focus().setParagraph().run();
-            }}
-          >
-            <option value="paragraph">Paragraph</option>
-            <option value="1">Heading 1</option>
-            <option value="2">Heading 2</option>
-            <option value="3">Heading 3</option>
-          </select>
+        <label>
+          Title
+          <input
+            value={title}
+            disabled={saving || blocked}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            required
+          />
         </label>
-        {button(
-          "Bullet list",
-          () => {
-            editor.chain().focus().toggleBulletList().run();
-          },
-          editor.isActive("bulletList"),
-        )}
-        {button(
-          "Numbered list",
-          () => {
-            editor.chain().focus().toggleOrderedList().run();
-          },
-          editor.isActive("orderedList"),
-        )}
-        {button(
-          "Indent",
-          () => {
-            editor.chain().focus().sinkListItem("listItem").run();
-          },
-          undefined,
-          !editor.can().sinkListItem("listItem"),
-        )}
-        {button(
-          "Outdent",
-          () => {
-            editor.chain().focus().liftListItem("listItem").run();
-          },
-          undefined,
-          !editor.can().liftListItem("listItem"),
-        )}
-        {button(
-          "Quote",
-          () => {
-            editor.chain().focus().toggleBlockquote().run();
-          },
-          editor.isActive("blockquote"),
-        )}
-        {button(
-          "Code block",
-          () => {
-            editor.chain().focus().toggleCodeBlock().run();
-          },
-          editor.isActive("codeBlock"),
-        )}
-        {button("Divider", () => {
-          editor.chain().focus().setHorizontalRule().run();
-        })}
-        {button("Link", () => {
-          setLink(editor.getAttributes("link").href ?? "");
-          setShowLink(!showLink);
-        })}
-        {button("Attach reference", () => setShowReference(!showReference))}
-        {button(
-          "Undo",
-          () => {
-            editor.chain().focus().undo().run();
-          },
-          undefined,
-          !editor.can().undo(),
-        )}
-        {button(
-          "Redo",
-          () => {
-            editor.chain().focus().redo().run();
-          },
-          undefined,
-          !editor.can().redo(),
-        )}
-      </div>
-      {showLink && (
-        <fieldset className="note-link-panel">
-          <legend>Link selected text</legend>
-          <label>
-            HTTP(S) URL
-            <input
-              type="url"
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-            />
-          </label>
-          {button("Apply link", () => {
-            try {
-              editor
-                .chain()
-                .focus()
-                .extendMarkRange("link")
-                .setLink({ href: noteLink(link) })
-                .run();
-              setShowLink(false);
-              setError("");
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          })}
-          {button("Remove link", () => {
-            editor.chain().focus().extendMarkRange("link").unsetLink().run();
-            setShowLink(false);
-          })}
-        </fieldset>
-      )}
-      {showReference && (
-        <fieldset className="note-reference-panel">
-          <legend>Attach notebook evidence</legend>
-          <label>
-            Reference source
-            <select value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="">Choose a source</option>
-              {sources
-                .filter((s) => !s.removed && s.current_revision)
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {loading && <p role="status">Loading passages…</p>}
-          <label>
-            Reference passage
+        <div
+          className="rich-note-toolbar"
+          role="group"
+          aria-label="Note formatting"
+        >
+          {button(
+            "Bold",
+            () => {
+              editor.chain().focus().toggleBold().run();
+            },
+            editor.isActive("bold"),
+          )}
+          {button(
+            "Italic",
+            () => {
+              editor.chain().focus().toggleItalic().run();
+            },
+            editor.isActive("italic"),
+          )}
+          {button(
+            "Underline",
+            () => {
+              editor.chain().focus().toggleUnderline().run();
+            },
+            editor.isActive("underline"),
+          )}
+          {button(
+            "Strikethrough",
+            () => {
+              editor.chain().focus().toggleStrike().run();
+            },
+            editor.isActive("strike"),
+          )}
+          {button(
+            "Inline code",
+            () => {
+              editor.chain().focus().toggleCode().run();
+            },
+            editor.isActive("code"),
+          )}
+          <label className="note-block-type">
+            Block style
             <select
-              value={passage}
+              aria-label="Block style"
+              value={
+                editor.isActive("heading")
+                  ? String(editor.getAttributes("heading").level)
+                  : "paragraph"
+              }
               onChange={(e) => {
-                setPassage(e.target.value);
-                setQuote(
-                  passages.find((p) => p.id === e.target.value)?.text ?? "",
-                );
+                const level = Number(e.target.value) as 1 | 2 | 3;
+                if (level) editor.chain().focus().setHeading({ level }).run();
+                else editor.chain().focus().setParagraph().run();
               }}
             >
-              <option value="">Choose a passage</option>
-              {passages.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.locator} · {p.text.slice(0, 80)}
-                </option>
-              ))}
+              <option value="paragraph">Paragraph</option>
+              <option value="1">Heading 1</option>
+              <option value="2">Heading 2</option>
+              <option value="3">Heading 3</option>
             </select>
           </label>
-          <label>
-            Exact evidence quote
-            <textarea
-              value={quote}
-              onChange={(e) => setQuote(e.target.value)}
-              rows={3}
-            />
-          </label>
-          <p className="fine">
-            Attach an exact excerpt. References stay with the note, but do not
-            certify edited claims.
-          </p>
           {button(
-            "Insert reference",
+            "Bullet list",
             () => {
-              const p = passages.find((p) => p.id === passage),
-                index = p?.text.indexOf(quote) ?? -1;
-              if (!p || !quote || index < 0) {
-                setError("The quote must match the chosen passage exactly.");
-                return;
-              }
-              const start = Array.from(p.text.slice(0, index)).length,
-                citation = {
-                  passageId: p.id,
-                  quote,
-                  start,
-                  end: start + Array.from(quote).length,
-                };
-              editor
-                .chain()
-                .focus()
-                .insertContent({ type: "citation", attrs: { citation } })
-                .run();
-              setShowReference(false);
-              setError("");
+              editor.chain().focus().toggleBulletList().run();
+            },
+            editor.isActive("bulletList"),
+          )}
+          {button(
+            "Numbered list",
+            () => {
+              editor.chain().focus().toggleOrderedList().run();
+            },
+            editor.isActive("orderedList"),
+          )}
+          {button(
+            "Indent",
+            () => {
+              editor.chain().focus().sinkListItem("listItem").run();
             },
             undefined,
-            !passage || !quote,
+            !editor.can().sinkListItem("listItem"),
           )}
-        </fieldset>
-      )}
-      <EditorContent editor={editor} className="rich-note-editor" />
-      <p className="fine">
-        {authoredReferenceNotice} Paste inserts plain text. Use the formatting
-        controls or keyboard shortcuts; Backspace removes a selected reference.
-      </p>
+          {button(
+            "Outdent",
+            () => {
+              editor.chain().focus().liftListItem("listItem").run();
+            },
+            undefined,
+            !editor.can().liftListItem("listItem"),
+          )}
+          {button(
+            "Quote",
+            () => {
+              editor.chain().focus().toggleBlockquote().run();
+            },
+            editor.isActive("blockquote"),
+          )}
+          {button(
+            "Code block",
+            () => {
+              editor.chain().focus().toggleCodeBlock().run();
+            },
+            editor.isActive("codeBlock"),
+          )}
+          {button("Divider", () => {
+            editor.chain().focus().setHorizontalRule().run();
+          })}
+          {button("Link", () => {
+            setLink(editor.getAttributes("link").href ?? "");
+            setShowLink(!showLink);
+          })}
+          {button("Attach reference", () => setShowReference(!showReference))}
+          {button(
+            "Undo",
+            () => {
+              editor.chain().focus().undo().run();
+            },
+            undefined,
+            !editor.can().undo(),
+          )}
+          {button(
+            "Redo",
+            () => {
+              editor.chain().focus().redo().run();
+            },
+            undefined,
+            !editor.can().redo(),
+          )}
+        </div>
+        {showLink && (
+          <fieldset className="note-link-panel">
+            <legend>Link selected text</legend>
+            <label>
+              HTTP(S) URL
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+              />
+            </label>
+            {button("Apply link", () => {
+              try {
+                editor
+                  .chain()
+                  .focus()
+                  .extendMarkRange("link")
+                  .setLink({ href: noteLink(link) })
+                  .run();
+                setShowLink(false);
+                setError("");
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            })}
+            {button("Remove link", () => {
+              editor.chain().focus().extendMarkRange("link").unsetLink().run();
+              setShowLink(false);
+            })}
+          </fieldset>
+        )}
+        {showReference && (
+          <fieldset className="note-reference-panel">
+            <legend>Attach notebook evidence</legend>
+            <label>
+              Reference source
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+              >
+                <option value="">Choose a source</option>
+                {sources
+                  .filter((s) => !s.removed && s.current_revision)
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {loading && <p role="status">Loading passages…</p>}
+            <label>
+              Reference passage
+              <select
+                value={passage}
+                onChange={(e) => {
+                  setPassage(e.target.value);
+                  setQuote(
+                    passages.find((p) => p.id === e.target.value)?.text ?? "",
+                  );
+                }}
+              >
+                <option value="">Choose a passage</option>
+                {passages.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.locator} · {p.text.slice(0, 80)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Exact evidence quote
+              <textarea
+                value={quote}
+                onChange={(e) => setQuote(e.target.value)}
+                rows={3}
+              />
+            </label>
+            <p className="fine">
+              Attach an exact excerpt. References stay with the note, but do not
+              certify edited claims.
+            </p>
+            {button(
+              "Insert reference",
+              () => {
+                const p = passages.find((p) => p.id === passage),
+                  index = p?.text.indexOf(quote) ?? -1;
+                if (!p || !quote || index < 0) {
+                  setError("The quote must match the chosen passage exactly.");
+                  return;
+                }
+                const start = Array.from(p.text.slice(0, index)).length,
+                  citation = {
+                    passageId: p.id,
+                    quote,
+                    start,
+                    end: start + Array.from(quote).length,
+                  };
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({ type: "citation", attrs: { citation } })
+                  .run();
+                setShowReference(false);
+                setError("");
+              },
+              undefined,
+              !passage || !quote,
+            )}
+          </fieldset>
+        )}
+        <EditorContent editor={editor} className="rich-note-editor" />
+        <p className="fine">
+          {authoredReferenceNotice} Paste inserts plain text. Use the formatting
+          controls or keyboard shortcuts; Backspace removes a selected
+          reference.
+        </p>
+      </fieldset>
       <button className="primary" disabled={saving || blocked || !!start.error}>
-        {saving ? "Saving…" : "Save note"}
+        {saving ? "Saving…" : retrySave ? "Retry save" : "Save note"}
       </button>
     </form>
   );

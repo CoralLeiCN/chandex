@@ -378,7 +378,7 @@ test("organization metadata, templates and note search survive restart and stopp
     assert.equal(store.template(t.id).instructions, data.instructions);
     assert.equal(
       store.one("SELECT max(version) AS version FROM migrations").version,
-      18,
+      19,
     );
   } finally {
     store.close();

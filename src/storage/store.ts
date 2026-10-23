@@ -274,6 +274,13 @@ export class Store {
           INSERT INTO migrations VALUES(18);
         `);
       });
+    if (!this.one("SELECT version FROM migrations WHERE version=19"))
+      this.tx(() => {
+        this.db.exec(`CREATE TABLE note_saves(
+          id TEXT PRIMARY KEY, notebook_id TEXT NOT NULL REFERENCES notebooks(id) ON DELETE CASCADE,
+          request_hash TEXT NOT NULL, artifact_id TEXT REFERENCES artifacts(id) ON DELETE SET NULL
+        ); INSERT INTO migrations VALUES(19);`);
+      });
     this.drafts = new NoteDraftStore(this);
     this.speech = new SpeechStore(this);
     this.run(

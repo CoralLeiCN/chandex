@@ -302,11 +302,15 @@ Enforce notebook ownership through database relationships and every application 
 
 The local API supports notebook CRUD, source import/refresh/removal, conversations, run start/cancel, artifact generation/edit/export, and citation resolution. Stream progress to the browser using server-sent events with application-assigned sequence numbers and replay from persisted run state. Do not assume Codex notifications are an exactly-once durable event log.
 
+Notebook switching must apply only responses belonging to the current selection and latest refresh. A late load must not replace the page or its conversation ID, including after switching away and back to the same notebook. Preserve a still-valid selected conversation on refresh and fall back when it has been removed.
+
 A structured answer has `status` (answered or insufficient_evidence), typed content blocks, citation records, and coverage warnings. Artifact outputs add a kind and structured sections. Persist the output schema version. The UI renders supported blocks safely instead of executing arbitrary returned HTML.
 
 ## 8. Notes and generated artifacts
 
 Saving an answer creates an editable note while preserving citations and its source manifest. User edits create a new artifact revision. Mark edited passages as user-authored; do not imply their original citations still support new text without revalidation.
+
+Place saved personal notes, recovery drafts and New note before Studio generation controls. Studio starts collapsed and remains keyboard-accessible on desktop and narrow screens.
 
 Studio generation shares the same source selection, retrieval, and citation contract as chat:
 
@@ -327,11 +331,15 @@ Provide a local visual editor with paragraphs, headings (levels 1–3), bold/ita
 
 Protect unsaved personal-note drafts. Close or Escape asks whether to keep editing or discard when the title/document has changed. Keeping the draft retains its text and returns focus; explicit discard closes the editor. Refuse closing while an explicit save is pending, then retain the draft if saving fails. Warn through the browser's ordinary leave-page prompt while changed text or a save is pending. Undo/reverting to the original title/document removes the unsaved-change warning. Local recovery drafts follow the criteria below; a successful explicit Save remains the publication boundary.
 
+An unconfirmed Save retains the exact request and offers explicit Retry save while pausing edits. Replaying a committed operation returns its original note without creating another note or revision, including after server restart or backup/restore. Receipt checks enforce notebook and request identity and never recreate a permanently deleted note. A definitive validation failure retains the draft and permits correction.
+
 Opening a generated output in the editor preserves its text, section/item/map/table labels, inference/gap/coverage qualifications and exact citation attachments. Edits become user-authored and display that attached references have not been semantically revalidated against the edited text. Citations are inline removable/reorderable atoms. Users may attach an exact quote from a stored passage in their notebook; malformed offsets/quotes and foreign IDs are refused. Retained historical references still open their immutable source revision. Existing attached references whose source was purged remain explicitly unavailable; they cannot be forged into new notes or imply current support.
 
 Every save creates an immutable revision, with stale-base refusal when another save changed the current note. Show revision history, inspect generated originals with their typed content/provenance and restore a historical revision as a new authored rich revision without overwriting any history or carrying a quiz scoring key forward. Keep legacy plain text/generated notes readable. Authored rich edits survive source purge; their reference buttons resolve as unavailable. Generated originals and derived source copies follow existing purge rules.
 
 Rich notes participate in local discovery, restart, stopped backup/restore, exact-revision source promotion and Markdown export. Export preserves formatting, explicitly labeled authored/reference status and immutable citation footnotes, escaping authored markup so literal HTML cannot execute in a Markdown renderer. Promotion uses readable text and an authored-reference qualification without creating independent corroboration. No editor/history operation starts a model run.
+
+Use as a source supplies the displayed revision ID. If another window changed the note before promotion starts, reject the request with a reopen instruction and create no import job. Once accepted, retain that exact revision and its title/text even if the note is edited during extraction.
 
 Acceptance requires formatting and nested structures, undo/redo and selection handling, legacy/generated conversion across every artifact kind without losing citations/qualifiers, strict shape/link/citation/budget validation, scoped API/history/stale-save/restore behavior, immutable original and promotion ancestry, purge/FTS/restart/backup behavior, and keyboard/desktop/mobile checks. Publishing integrations remain a separate planned extension; human semantic and release gates remain unchanged.
 

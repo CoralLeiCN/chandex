@@ -243,7 +243,7 @@ for (const legacy of [false, true])
           JSON.parse(
             readFileSync(path.join(root, "backup", "manifest.json"), "utf8"),
           ).schema,
-          legacy ? 15 : 18,
+          legacy ? 15 : 19,
         );
         restore(path.join(root, "backup"), restored);
         store = new Store(restored);
@@ -336,7 +336,7 @@ test("schema 3 backups restore and migrate without losing evidence or completed 
     store = new Store(path.join(root, "restored"));
     assert.equal(
       store.one("SELECT max(version) AS version FROM migrations").version,
-      18,
+      19,
     );
     assert.equal(
       store.one("SELECT status FROM runs WHERE id=?", r.id).status,

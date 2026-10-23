@@ -11,6 +11,7 @@ import "./style.css";
 import { documentGroups, documentText } from "../domain/artifacts.ts";
 
 import { api } from "./api.ts";
+import { useNotebookPage } from "./use-notebook-page.ts";
 import { VoiceQuestion } from "./voice-question.tsx";
 import { DriveControls } from "./drive-connection.tsx";
 import { WebResearchDialog } from "./web-research.tsx";
@@ -274,13 +275,15 @@ function GenerationDetails({ run }: { run: any }) {
 
 function App() {
   const [books, setBooks] = useState<any[]>([]),
-    [nbId, setNbId] = useState(""),
-    [page, setPage] = useState<any>(null),
-    [convId, setConvId] = useState("");
+    [nbId, setNbId] = useState("");
   const [runtime, setRuntime] = useState<any>(null),
     [model, setModel] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const { page, convId, setConvId, refresh, nbRef } = useNotebookPage(
+    nbId,
+    setError,
+  );
   const [driveStatus, setDriveStatus] = useState<DriveConnectionStatus | null>(
     null,
   );
@@ -300,15 +303,6 @@ function App() {
   const composer = useRef<HTMLTextAreaElement>(null);
   const addSourcesControl = useRef<HTMLButtonElement>(null);
   const trashControl = useRef<HTMLButtonElement>(null);
-  const nbRef = useRef(nbId);
-  nbRef.current = nbId;
-  const refresh = async (id = nbRef.current) => {
-    if (id) {
-      const p = await api("/notebooks/" + id);
-      if (id === nbRef.current) setPage(p);
-      return p;
-    }
-  };
   const list = async () => {
     const b = await api("/notebooks");
     setBooks(b);
@@ -345,14 +339,9 @@ function App() {
     setError("");
   }, [modal]);
   useEffect(() => {
-    setPage(null);
     setRetryJob(null);
     if (!nbId) return;
     localStorage.setItem("codeboom-notebook", nbId);
-    void act(async () => {
-      const p = await refresh(nbId);
-      setConvId(p.conversations[0]?.id ?? "");
-    });
   }, [nbId]);
   const conv = page?.conversations.find((c: any) => c.id === convId);
   const selected = conv?.selected ?? [];
@@ -1251,57 +1240,6 @@ function App() {
                 <h2>Notes & Studio</h2>
                 <span className="panel-symbol">✧</span>
               </div>
-              <div className="studio-intro">
-                <h3>Turn insight into something useful.</h3>
-                <p>Create a document from your selected sources.</p>
-              </div>
-              <label className="study-count">
-                Flashcard / quiz items
-                <select
-                  value={itemCount}
-                  onChange={(e) => setItemCount(Number(e.target.value))}
-                >
-                  {Array.from({ length: 16 }, (_, index) => index + 5).map(
-                    (count) => (
-                      <option key={count} value={count}>
-                        {count}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <div className="studio-grid">
-                {kinds
-                  .filter(
-                    ([kind]) =>
-                      kind !== "audio-overview" ||
-                      runtime?.audioOverviewsEnabled,
-                  )
-                  .map(([kind, icon, label, desc]) => (
-                    <button
-                      key={kind}
-                      disabled={
-                        !selected.length ||
-                        !!active ||
-                        busy ||
-                        voiceBusy ||
-                        !runtime?.available
-                      }
-                      onClick={() =>
-                        send(
-                          "Create a comprehensive " +
-                            label.toLowerCase() +
-                            " using every selected source. Identify disagreements and gaps. Cite each factual statement.",
-                          kind,
-                        )
-                      }
-                    >
-                      <span className={"studio-icon " + kind}>{icon}</span>
-                      <strong>{label}</strong>
-                      <small>{desc}</small>
-                    </button>
-                  ))}
-              </div>
               <div className="notes-heading">
                 <h3>
                   Saved notes{" "}
@@ -1323,7 +1261,7 @@ function App() {
                     setModal("edit-note");
                   }}
                 >
-                  ＋ New
+                  ＋ New note
                 </button>
               </div>
               {!!page.drafts?.length && (
@@ -1390,6 +1328,60 @@ function App() {
                   ))}
                 </div>
               )}
+              <details className="studio-tools">
+                <summary>Studio · Create from sources</summary>
+                <div className="studio-intro">
+                  <h3>Turn insight into something useful.</h3>
+                  <p>Create a document from your selected sources.</p>
+                </div>
+                <label className="study-count">
+                  Flashcard / quiz items
+                  <select
+                    value={itemCount}
+                    onChange={(e) => setItemCount(Number(e.target.value))}
+                  >
+                    {Array.from({ length: 16 }, (_, index) => index + 5).map(
+                      (count) => (
+                        <option key={count} value={count}>
+                          {count}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+                <div className="studio-grid">
+                  {kinds
+                    .filter(
+                      ([kind]) =>
+                        kind !== "audio-overview" ||
+                        runtime?.audioOverviewsEnabled,
+                    )
+                    .map(([kind, icon, label, desc]) => (
+                      <button
+                        key={kind}
+                        disabled={
+                          !selected.length ||
+                          !!active ||
+                          busy ||
+                          voiceBusy ||
+                          !runtime?.available
+                        }
+                        onClick={() =>
+                          send(
+                            "Create a comprehensive " +
+                              label.toLowerCase() +
+                              " using every selected source. Identify disagreements and gaps. Cite each factual statement.",
+                            kind,
+                          )
+                        }
+                      >
+                        <span className={"studio-icon " + kind}>{icon}</span>
+                        <strong>{label}</strong>
+                        <small>{desc}</small>
+                      </button>
+                    ))}
+                </div>
+              </details>
               <div className="local-note">
                 <span>◉</span> Saved on this computer
               </div>
@@ -2369,7 +2361,7 @@ function App() {
                         note.id +
                         "/promote",
                       "POST",
-                      {},
+                      { revisionId: note.revision_id },
                     );
                     await refresh();
                     setModal("");
@@ -2510,6 +2502,7 @@ function App() {
                       title,
                       document,
                       draft: context.draft,
+                      saveId: context.saveId,
                       ...(note
                         ? { baseRevisionId: context.baseRevisionId }
                         : {}),
@@ -2582,7 +2575,6 @@ function App() {
                 await api("/notebooks/" + nbId, "DELETE");
                 const b = await list();
                 setNbId(b[0]?.id ?? "");
-                setPage(null);
                 setModal("");
               })
             }
