@@ -1,6 +1,8 @@
 # Codeboom product and technical specification
 
-Current user scope (2026-10-10): personal notes; dictation for questions about saved notes and written answers; local cited materials/exports and explicit web research. Video output, provider publishing, generated audio, YouTube and cloud/team features are deferred. This decision supersedes their earlier expansion priorities.
+## Current scope
+
+User decision (2026-10-10): personal notes; dictation for questions about saved notes and written answers; local cited materials/exports and explicit web research. Video output, provider publishing, generated audio, YouTube and cloud/team features are deferred. This decision supersedes their earlier expansion priorities.
 
 ## Explicit web research acceptance criteria (2026-10-10)
 

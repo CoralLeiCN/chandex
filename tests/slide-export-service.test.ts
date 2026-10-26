@@ -7,7 +7,9 @@ import { Store } from "../src/storage/store.ts";
 import { extract } from "../src/ingestion/extract.ts";
 import { exportPptx } from "../src/domain/export-pptx.ts";
 import { SlideExportService } from "../src/server/slide-export-service.ts";
+import { InfographicExportService } from "../src/server/infographic-export-service.ts";
 import { slideAnswer, slideSourceText } from "./fixtures/slides.ts";
+import { infographicAnswer } from "./fixtures/infographic.ts";
 
 async function fixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "codeboom-slide-export-"));
@@ -63,6 +65,61 @@ function controlledAssembly() {
   };
   return { entered, release, assemble, requests, calls: () => calls };
 }
+
+test("slide capacity and shutdown remain independent of infographic exports", async () => {
+  const f = await fixture(),
+    gate = controlledAssembly(),
+    slides = new SlideExportService(f.store, gate.assemble),
+    images = new InfographicExportService(f.store);
+  try {
+    const conversation = f.store.view(f.n).conversations[0].id;
+    const run = f.store.createRun(
+      f.n,
+      conversation,
+      "Infographic",
+      "infographic",
+      "fixture",
+      "image-run",
+    );
+    f.store.completeRun(run.id, infographicAnswer(f.p));
+    const infographic = f.store
+      .view(f.n)
+      .artifacts.find(
+        (artifact: { kind: string }) => artifact.kind === "infographic",
+      )!;
+    const first = slides.export(f.n, f.artifact.id),
+      second = slides.export(f.n, f.artifact.id);
+    // Observe settlement immediately, including if an assertion fails during assembly.
+    const outputs = Promise.allSettled([first, second]);
+    await gate.entered.promise;
+    await assert.rejects(slides.export(f.n, f.artifact.id), {
+      message: "PowerPoint export capacity is full. Try again shortly.",
+    });
+    assert.ok(
+      (await images.export(f.n, infographic.id, undefined, "svg")).length >
+        1000,
+    );
+    const closing = slides.shutdown();
+    await assert.rejects(slides.export(f.n, f.artifact.id), {
+      message: "PowerPoint export is shutting down.",
+    });
+    assert.ok(
+      (await images.export(f.n, infographic.id, undefined, "png")).length >
+        1000,
+    );
+    gate.release.resolve();
+    await closing;
+    for (const result of await outputs) {
+      assert.equal(result.status, "rejected");
+      if (result.status === "rejected")
+        assert.equal(result.reason.message, "Slide export was cancelled.");
+    }
+  } finally {
+    gate.release.resolve();
+    await Promise.all([slides.shutdown(), images.shutdown()]);
+    f.close();
+  }
+});
 
 test("actual assembled PowerPoint is withheld if its evidence is purged before delivery", async () => {
   const f = await fixture(),

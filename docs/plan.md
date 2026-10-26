@@ -1,20 +1,8 @@
 # Codeboom implementation plan
 
-Note reliability and layout refinement (2026-10-23): safe retries for unconfirmed note saves, displayed-revision checks for promotion, late-response protection for notebook/conversation loading and personal notes above collapsed Studio controls are implemented. Schema 19 retains save receipts through restart and backup. See [verification](verification.md#note-reliability-and-notes-first-layout-2026-10-23).
+Status: First working prototype implemented. M1–M4 are substantially complete; M5.6 still awaits named human review. [Verification](verification.md#recorded-status) owns dated test results and release limitations, including the latest note-reliability checkpoint.
 
-Latest scope clarification (2026-10-10): **video output and provider publishing integrations are user-deferred**, alongside cloud/team, generated audio and YouTube. Explicit web research remains in current scope and now has a local query-only discovery/snapshot prototype. Retain older checkpoints as history without treating their deferred work as current obligations.
-
-Local infographic increment (2026-10-10): typed cited templates, saved-revision viewer and bounded PNG/SVG exports are implemented with [265-test/lifecycle/native/browser evidence](../evals/results/2026-10-10-infographic-integration-v8.json). Human semantic, representative rendering/load and model reliability gates remain open. Main and manual preview origins are fixed at port 40732/44281 at the user's request. Cloud/team work stays deferred; broader local work remains active.
-
-Current priority, clarified by the user on 2026-10-10: **personal notes and voice questions about existing notes only**. Note dictation is removed from the editor; voice recording is available only in saved-note conversations, with review and explicit Send. Written answers remain the default. Audio generation and YouTube support are deferred at the user's request. Original broader work and named release gates remain recorded; deferred features are not claimed complete.
-
-Status: First working prototype implemented. M1–M4 are substantially complete; remaining release checks are listed below and in [verification](verification.md).
-Current release audit (2026-10-10): [274-test/current contract-8 grounding record](../evals/results/2026-10-10-release-audit-v8.json) refreshes the fixed corpus and hash-bound human packet. Automated statuses/spans/canaries pass; M5.6 remains unchecked. The user will provide review later. Human/user-assisted release qualification blocks completion; do not replace it with agent judgments or repeated automated runs. The current main app is running at port 40732 and preview data remains separate at 44281.
-Current user priorities (2026-10-10): local personal notes, dictation instead of typing questions about saved notes, and written answers. Cloud hosting/team accounts/sharing/collaboration/synchronization, generated audio and YouTube are deferred. Historical checkpoints below retain their original scope; this explicit user decision supersedes their cloud/team implementation expectations.
-
-Latest local progress: cited slides and exact-revision PowerPoint export have [lifecycle and multislide evidence](../evals/results/2026-10-10-slides-lifecycle-v7.json): 252-test regression, real HTTP exports, controlled actual-encoder purge/cancel/admission/shutdown races and live desktop/mobile two-slide navigation. [Bundled LibreOfficeDev rendering](../evals/results/2026-10-10-slides-native-v7.json) covers three synthetic decks/seven pages; Microsoft PowerPoint, Keynote, stable LibreOffice, representative files/fonts, live assistive technology and named human semantic gates remain open. Existing local requirements remain active; this checkpoint does not establish completion.
-Basis: [Product specification](spec.md) and [product intent](../intent.md).
-Technical authority: [Technical decisions](technical-decisions.md).
+Basis: [Product specification and current scope](spec.md#current-scope), [product intent](../intent.md), and [technical decisions](technical-decisions.md). Historical checkpoints below retain their original scope; the specification's current scope takes precedence.
 
 Build the first source-grounded notebook as a sequence of working increments. Prove the Codex integration and its access boundaries before building the full interface. The first release covers the formats, conversations, notes, and four Studio outputs defined by the spec; expanded parity remains a later backlog.
 
@@ -25,7 +13,12 @@ Build the first source-grounded notebook as a sequence of working increments. Pr
 | [intent.md](../intent.md) | Product purpose and guiding principles |
 | [docs/spec.md](spec.md) | Product behavior, scope, requirements, and acceptance criteria |
 | [docs/technical-decisions.md](technical-decisions.md) | Architecture, technology choices, tradeoffs, and technical questions awaiting evidence |
-| This plan | Work sequence, dependencies, deliverables, and completion evidence |
+| This plan | Work sequence, dependencies, deliverables, and task status |
+| [README.md](../README.md) | Setup, operation, and user-facing feature guidance |
+| [docs/requirements-audit.md](requirements-audit.md) | Requirement-to-evidence mapping and remaining acceptance gaps |
+| [docs/verification.md](verification.md) | Dated verification results, artifacts, and qualification limits |
+
+Keep scope decisions in the spec and detailed test results in verification; use links from the README, plan and audit rather than copying status narratives. Historical checkpoints remain dated evidence.
 
 Technical changes must update the decision record. Requirement changes must also update the spec. Completing a task means recording its verification evidence, not merely creating its files. Unchecked items below are planned work.
 
@@ -132,8 +125,7 @@ Technical decisions: TD-04 through TD-17.
 - [x] M5.4 Exercise malicious document instructions, unauthorized source IDs, source paths, unsafe markup, private-address URLs, redirects, and unrelated runtime tools. Verify boundaries at the service and runtime levels.
 - [x] M5.5 Run keyboard, focus-return, responsive layout, and screen-reader-label checks for imports, source selection, citation navigation, generation, and stop controls. The named checks are recorded in verification; live assistive-technology qualification remains a separate limitation.
 - [ ] M5.6 Version the evaluation corpus and human-review rubric. Run the semantic support and abstention gates below using the pinned model/runtime configuration.
-  Current packet: `.codeboom/review/2026-10-10-final-v8-rubric-v1.json`, bound to `evals/results/2026-10-10-final-grounding-v8.json`. Corpus/rubric/run/packet are prepared; named human review remains pending until the user reviews later.
-  [Review integrity verification](../evals/results/2026-10-10-review-integrity-v1.json) closes copied-context/date checks with 275 passing regressions; the actual packet remains unchanged and unreviewed. The rubric and support thresholds remain unchanged.
+  The [release audit](verification.md#release-audit-2026-10-10) identifies the prepared corpus/run/review packet; [review-integrity verification](verification.md#human-review-integrity-2026-10-10) records checker coverage. The packet remains unreviewed and the original rubric and support thresholds apply.
 - [x] M5.7 Measure ingestion time, time to first progress, answer latency, cancellation completion, and resource use. Record the baseline rather than inventing performance guarantees.
 - [x] M5.8 Document setup, supported macOS/runtime versions, authentication, data locations, backup/restore, known limits, and model-data flow. Verify a clean setup and a backup restore.
 - [x] M5.9 Record release evidence against every acceptance row, update decision statuses, and document unresolved limitations. No gate is marked passed solely because its code exists.
@@ -180,33 +172,17 @@ PN1 and PN2 were added at the user's request on 2026-10-12. PN1 was subsequently
 
 Before implementing an extension, define its user acceptance criteria in the spec and its technical implications in the decision record.
 
-Explicit web research checkpoint (2026-10-10): [273-test integration record](../evals/results/2026-10-10-web-research-integration-v1.json), query-only live search and cancellation probes, desktop/mobile reviewed import, retained snapshot provenance and exact source-only answer citation. This implements the separate discovery/evidence policy; human relevance, representative-site/provider qualification and the existing release gates remain open. Video and provider publishing are user-deferred.
-
-Flashcards/quizzes now have [acceptance criteria](spec.md#study-expansion-flashcards-and-quizzes), TD-14/TD-15 implications and an implemented local prototype. Their deterministic/runtime/browser checks are recorded in verification; named human support and quiz-ambiguity review remain open. Mind maps/data tables now have their own criteria and implementation evidence below; the other expansions above remain planned.
+Extension checks and open qualification limits are recorded in [verification](verification.md); acceptance criteria remain in the [specification](spec.md).
 
 Sequencing update, 2026-10-10: the ongoing request to implement all planned work authorizes continued local development while M5.6 awaits human judgments. M5 remains a release acceptance dependency. This changes development order, preserves every original acceptance threshold, and does not claim a complete first or expanded release.
 
 ## Completion and update procedure
 
-For each completed task, replace its checkbox only after verification and add a short evidence entry below. Include task ID, change or commit reference when available, verification result, and any limitation. Update dependent tasks when a gate changes.
+For each completed task, update its checkbox only after verification. Record the task ID, change or commit reference when available, result and limitations in [verification](verification.md), then update the [requirement-to-evidence mapping](requirements-audit.md#planned-tasks). Link to that evidence here instead of duplicating its test counts or detailed narrative. Update dependent tasks when a gate changes.
 
-| Task or milestone | Evidence | State |
-| --- | --- | --- |
-| M1 | Pinned executable/types, live cited comparison, scoped tools, exact quote validation, native sandbox denial, startup cancellation and transport/race tests | Prototype proof passed on tested macOS |
-| M2.1–M2.8 | SQLite migrations 1–12, original bytes, immutable revisions, FTS5, isolated parser worker, all initial input adapters, source viewer, durable duplicate offers, linked import retries and instruction versions | Implemented; synthetic checks passed |
-| M2.9 | Restart, duplicate imports, Unicode, old revisions and notebook rejection; all redirect statuses, relative/malformed locations, mixed DNS, rebinding, pinned lookup and download limits verified in controlled transport tests | Passed listed regression checks |
-| M3.1–M3.3, M3.5–M3.7, M3.9 | Real browser chat/citation flow and live selection-change abstention; atomic manifest/generation checks | Passed listed checks |
-| M3.4, M3.8 | Persisted terminal events and Last-Event-ID replay; live browser reload retained run 8a45475e-948d-433d-a164-966fa41a65bc with one attempt; structured authentication/rate-limit/validation/timeout/interruption categories and linked retry fault tests | Passed controlled faults and live reconnect |
-| M4 | Real summary and saved note with export, artifact revisions, derived sources and shared validation | Implemented; representative flow passed |
-| M5.1, M5.4 | Atomic restart/cancellation events, staged cleanup, parser/runtime faults, scoped IDs, private URLs, 40/40 injection-canary resistance and fresh native read/write/network denial | Passed named regression corpus; broader production inputs remain a qualification limit |
-| M5.2 | Configurable hard budgets, scoped usage/diagnostics and runtime-reported model context admission; 85 tests and fresh contract-4 model/browser checks | Verified named limits, unknown-capacity failure and smaller-evidence admission |
-| M5.3 | Verified purge of managed evidence including generated promoted copies | Implemented and tested |
-| M5.5 | Keyboard create/import/select/send/stop/citation/save/reconnect; Send/Stop focus return; mobile pressed state, visible source count and 390px layout checked | Named checks passed; live assistive-technology qualification pending |
-| M5.6 | Fresh 2026-10-10 tool-contract-4 run: 30/30 answerable, 10/10 abstentions, 40/40 injection canaries; validated unreviewed claim packet and human-review checker prepared | Human semantic gate pending |
-| M5.7 | New 40-run latency baseline; sampled server/worker RSS and ingestion timings for long TXT/Markdown/HTML and a 25-page PDF, including two concurrent imports | Baseline recorded; sustained production load is not qualified |
-| M5.8–M5.9 | Setup, pinned environment, retention, backup restore and acceptance evidence documented | Completed documentation and backup proof |
+The next release gate is named human claim-support review. Existing live assistive-technology and representative-input qualification limits remain recorded in verification.
 
-The next release gate is named human claim-support review. Selected-model context admission is implemented and verified in the stated scope. Live assistive-technology use and expanded real-document/fault qualification remain limitations where the bounded synthetic corpus does not establish production behavior. The 2026-10-09 full quality rerun and resource baseline are recorded in verification. The local application can be run using the README. The [requirement-by-requirement audit](requirements-audit.md) records all planned tasks, acceptance contracts and later work without declaring the goal complete.
+The dated checkpoints below preserve earlier implementation history. New results belong in verification.
 
 ### Additional specification-audit evidence, 2026-10-09
 
